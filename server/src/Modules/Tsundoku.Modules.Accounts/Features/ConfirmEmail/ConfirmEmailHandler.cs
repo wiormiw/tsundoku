@@ -23,6 +23,9 @@ internal sealed class ConfirmEmailHandler(UserManager<AccountUser> users) : ICom
         }
 
         if (await users.FindByIdAsync(command.UserId.ToString()) is not { } user) return AccountErrors.ConfirmationInvalid;
-        return (await users.ConfirmEmailAsync(user, token)).Succeeded ? Success.Value : AccountErrors.ConfirmationInvalid;
+        if (!(await users.ConfirmEmailAsync(user, token)).Succeeded) return AccountErrors.ConfirmationInvalid;
+        // The token embeds the security stamp: a new stamp makes this link single-use.
+        await users.UpdateSecurityStampAsync(user);
+        return Success.Value;
     }
 }

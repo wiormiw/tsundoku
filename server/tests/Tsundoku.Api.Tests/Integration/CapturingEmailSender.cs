@@ -10,20 +10,35 @@ internal sealed class CapturingEmailSender : IAccountMailer
     internal sealed record Mail(string Email, string? Link);
 
     private readonly ConcurrentQueue<Mail> _mails = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _holds = new();
+
+    /// <summary>Makes sends to <paramref name="email"/> wait until the returned handle is disposed, to show who is waiting for the mailer.</summary>
+    public IDisposable Hold(string email)
+    {
+        var gate = _holds[email] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return new Release(gate);
+    }
+
+    private sealed class Release(TaskCompletionSource gate) : IDisposable
+    {
+        public void Dispose() => gate.TrySetResult();
+    }
+
+    private Task Wait(string email) => _holds.TryGetValue(email, out var gate) ? gate.Task : Task.CompletedTask;
 
     /// <summary>The mails sent to <paramref name="email"/>. A link is null for the "already registered" notice.</summary>
     public Mail[] To(string email) => [.. _mails.Where(mail => mail.Email == email)];
 
-    public Task SendConfirmationLinkAsync(AccountUser user, string email, string confirmationLink)
+    public async Task SendConfirmationLinkAsync(AccountUser user, string email, string confirmationLink)
     {
+        await Wait(email);
         _mails.Enqueue(new Mail(email, confirmationLink));
-        return Task.CompletedTask;
     }
 
-    public Task SendAlreadyRegisteredAsync(AccountUser user)
+    public async Task SendAlreadyRegisteredAsync(AccountUser user)
     {
+        await Wait(user.Email!);
         _mails.Enqueue(new Mail(user.Email!, null));
-        return Task.CompletedTask;
     }
 
     public Task SendPasswordResetLinkAsync(AccountUser user, string email, string resetLink) => throw new NotSupportedException();

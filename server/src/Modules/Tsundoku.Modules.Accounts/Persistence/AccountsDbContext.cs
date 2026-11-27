@@ -28,7 +28,7 @@ internal sealed class AccountsDbContext(DbContextOptions<AccountsDbContext> opti
         base.OnModelCreating(modelBuilder);
         ModulePersistence.ConfigureModel(modelBuilder, AccountsModule.Schema);
 
-        modelBuilder.Entity<AccountUser>().ToTable("users");
+        modelBuilder.Entity<AccountUser>().ToTable("users").Ignore(user => user.DomainEvents);
         modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("user_logins");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("user_tokens");

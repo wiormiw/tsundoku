@@ -1,5 +1,7 @@
 using System.Net;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -16,6 +18,16 @@ public sealed class SignUpTests(ApiFactory factory)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private static async Task WaitFor(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow > deadline) throw new TimeoutException("The outbox did not send the mail.");
+            await Task.Delay(50, Ct);
+        }
+    }
+
     private static string NewEmail() => $"{Guid.NewGuid():N}@example.test";
 
     private static Task<HttpResponseMessage> SignUp(HttpClient client, string email) =>
@@ -24,7 +36,17 @@ public sealed class SignUpTests(ApiFactory factory)
     private static Task<HttpResponseMessage> Resend(HttpClient client, string email) =>
         client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email }, Ct);
 
-    private static string LinkOf(CapturingEmailSender mail, string email) => mail.To(email).Single(m => m.Link is not null).Link!;
+    /// <summary>Mails go out after the commit through the outbox, so wait for the <paramref name="count"/>th link to arrive.</summary>
+    private static async Task<string> LinkOf(CapturingEmailSender mail, string email, int count = 1)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        while (mail.To(email).Count(m => m.Link is not null) < count)
+        {
+            if (DateTimeOffset.UtcNow > deadline) throw new TimeoutException("The outbox did not send the confirmation mail.");
+            await Task.Delay(50, Ct);
+        }
+        return mail.To(email).Where(m => m.Link is not null).ElementAt(count - 1).Link!;
+    }
 
     private async Task<bool?> EmailConfirmed(string email)
     {
@@ -44,7 +66,7 @@ public sealed class SignUpTests(ApiFactory factory)
         (await SignUp(client, email)).StatusCode.ShouldBe(HttpStatusCode.Accepted);
         (await EmailConfirmed(email)).ShouldBe(false);
 
-        var confirm = await client.GetAsync(new Uri(LinkOf(factory.Mail, email)).PathAndQuery, Ct);
+        var confirm = await client.GetAsync(new Uri(await LinkOf(factory.Mail, email)).PathAndQuery, Ct);
 
         confirm.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await confirm.Content.ReadAsStringAsync(Ct)).ShouldBe("Your email is confirmed. You can sign in now.");
@@ -80,7 +102,7 @@ public sealed class SignUpTests(ApiFactory factory)
 
         // One hash on each branch, so the time does not give the address away (Review Focus 4).
         (firstCalls, againCalls, otherCalls).ShouldBe((1, 1, 1));
-        factory.Mail.To(email).Count(mail => mail.Link is null).ShouldBe(1);
+        await WaitFor(() => factory.Mail.To(email).Count(mail => mail.Link is null) == 1);
 
         static string[] HeaderNames(HttpResponseMessage response) =>
             [.. response.Headers.Concat(response.Content.Headers).Select(h => h.Key).Where(k => k != "Date").Order()];
@@ -111,7 +133,7 @@ public sealed class SignUpTests(ApiFactory factory)
         using var client = factory.CreateApiClient(user: null);
         var email = NewEmail();
         await SignUp(client, email);
-        var link = LinkOf(factory.Mail, email);
+        var link = await LinkOf(factory.Mail, email);
         var tampered = link[..^1] + (link[^1] == 'A' ? 'B' : 'A');
         var unknownUser = link.Replace("userId=", $"userId={Guid.NewGuid()}&was=", StringComparison.Ordinal);
 
@@ -133,7 +155,7 @@ public sealed class SignUpTests(ApiFactory factory)
         var confirmed = NewEmail();
         await SignUp(client, unconfirmed);
         await SignUp(client, confirmed);
-        await client.GetAsync(new Uri(LinkOf(factory.Mail, confirmed)).PathAndQuery, Ct);
+        await client.GetAsync(new Uri(await LinkOf(factory.Mail, confirmed)).PathAndQuery, Ct);
         var unknown = NewEmail();
 
         foreach (var email in new[] { unknown, confirmed, unconfirmed })
@@ -143,6 +165,7 @@ public sealed class SignUpTests(ApiFactory factory)
             (await response.Content.ReadAsStringAsync(Ct)).ShouldBeEmpty();
         }
 
+        await LinkOf(factory.Mail, unconfirmed, 2);
         factory.Mail.To(unknown).ShouldBeEmpty();
         factory.Mail.To(confirmed).Length.ShouldBe(1);
         factory.Mail.To(unconfirmed).Length.ShouldBe(2);
@@ -152,8 +175,9 @@ public sealed class SignUpTests(ApiFactory factory)
     public async Task Nothing_secret_is_logged()
     {
         var logs = new CapturingLoggerProvider();
-        // The real log mailer, so its lines are in the capture too: they carry the user id and the link, never the address.
+        // The real log mailer in Development, where it may log the link: the capture must still hold no address and no password.
         using var logging = factory.WithWebHostBuilder(host => host
+            .UseEnvironment("Development")
             .ConfigureServices(services =>
             {
                 services.AddLogging(builder => builder.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
@@ -171,6 +195,84 @@ public sealed class SignUpTests(ApiFactory factory)
 
         logs.Messages.ShouldNotBeEmpty();
         logs.Messages.ShouldAllBe(message => !message.Contains(Password, StringComparison.Ordinal) && !message.Contains(email, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task The_mail_goes_out_after_the_commit_through_the_outbox_not_in_the_request()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var email = NewEmail();
+
+        // The mailer waits here. A request that called it would hang, so the 202 shows it does not.
+        using (factory.Mail.Hold(email))
+        {
+            (await SignUp(client, email)).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+            factory.Mail.To(email).ShouldBeEmpty();
+
+            await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
+            await connection.OpenAsync(Ct);
+            await using var command = new NpgsqlCommand(
+                "select type, payload::text from accounts.outbox_messages where payload::text like '%' || (select id::text from accounts.users where email = @email) || '%'",
+                connection);
+            command.Parameters.AddWithValue("email", email);
+            await using var reader = await command.ExecuteReaderAsync(Ct);
+            (await reader.ReadAsync(Ct)).ShouldBeTrue();
+            reader.GetString(0).ShouldBe("ConfirmationRequested");
+            // Only the user id: no token and no link in the outbox.
+            System.Text.Json.JsonElement.Parse(reader.GetString(1)).EnumerateObject().Count().ShouldBe(1);
+        }
+
+        (await LinkOf(factory.Mail, email)).ShouldContain("code=");
+    }
+
+    [Fact]
+    public async Task A_used_confirmation_link_is_400_the_second_time()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var email = NewEmail();
+        await SignUp(client, email);
+        var link = new Uri(await LinkOf(factory.Mail, email)).PathAndQuery;
+
+        (await client.GetAsync(link, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        var again = await client.GetAsync(link, Ct);
+
+        again.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await again.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.confirmation_invalid");
+    }
+
+    [Fact]
+    public async Task An_expired_confirmation_link_is_400()
+    {
+        // Identity stamps and checks token times with the system clock, not TimeProvider, so a short lifespan stands in for a clock change.
+        using var shortLived = factory.WithWebHostBuilder(host => host.ConfigureTestServices(services =>
+            services.Configure<DataProtectionTokenProviderOptions>(token => token.TokenLifespan = TimeSpan.FromSeconds(1))));
+        using var client = shortLived.CreateClient();
+        var email = NewEmail();
+        await SignUp(client, email);
+        var link = new Uri(await LinkOf(factory.Mail, email)).PathAndQuery;
+        await Task.Delay(TimeSpan.FromSeconds(2), Ct);
+
+        var response = await client.GetAsync(link, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.confirmation_invalid");
+        (await EmailConfirmed(email)).ShouldBe(false);
+    }
+
+    [Fact]
+    public void Startup_refuses_open_sign_up_with_only_the_log_mailer_outside_Development()
+    {
+        Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");
+        using var logOnly = factory.WithWebHostBuilder(host => host.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IAccountMailer>();
+            services.RemoveAll<IEmailSender<AccountUser>>();
+            services.AddSingleton<IAccountMailer, LogEmailSender>();
+        }));
+
+        var failure = Should.Throw<OptionsValidationException>(() => logOnly.CreateClient());
+
+        failure.Message.ShouldContain("needs a real mailer (B9); use Google sign-in until then");
     }
 
     private sealed class HashCounter

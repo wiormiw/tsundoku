@@ -6,7 +6,11 @@ using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Identity;
 using Tsundoku.Common.Messaging;
 using Tsundoku.Common.Persistence;
+using Tsundoku.Common.Events;
+using Tsundoku.Modules.Accounts.Domain;
 using Tsundoku.Modules.Accounts.Features;
+using Tsundoku.Modules.Accounts.Features.OnAlreadyRegisteredNoticeRequested;
+using Tsundoku.Modules.Accounts.Features.OnConfirmationRequested;
 using Tsundoku.Modules.Accounts.Features.ConfirmEmail;
 using Tsundoku.Modules.Accounts.Features.ResendConfirmation;
 using Tsundoku.Modules.Accounts.Features.SignUp;
@@ -68,6 +72,8 @@ public static class AccountsModule
         services.AddSingleton<IAccountMailer>(provider => provider.GetRequiredService<LogEmailSender>());
         services.AddSingleton<IEmailSender<AccountUser>>(provider => provider.GetRequiredService<IAccountMailer>());
         services.AddScoped<ConfirmationMail>();
+        services.AddDomainEventHandler<ConfirmationRequested, ConfirmationRequestedHandler>();
+        services.AddDomainEventHandler<AlreadyRegisteredNoticeRequested, AlreadyRegisteredNoticeRequestedHandler>();
         services.AddScoped<CredentialTiming>();
 
         services.AddValidator<SignUpCommand, SignUpCommandValidator>();

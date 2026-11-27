@@ -8,12 +8,11 @@ using Tsundoku.Modules.Accounts.Persistence;
 namespace Tsundoku.Modules.Accounts.Features.SignUp;
 
 /// <summary>
-/// A new and an existing address get the same answer and the same work: one password hash and one mail.
-/// The unit of work saves; UserManager's own save happens inside its transaction.
+/// A new and an existing address get the same answer and the same work: one password hash and one outbox row. The mail goes out
+/// after the commit. The unit of work saves; UserManager's own save happens inside its transaction.
 /// </summary>
 internal sealed partial class SignUpHandler(
-    UserManager<AccountUser> users, ConfirmationMail confirmation, IAccountMailer mailer, CredentialTiming timing,
-    IOptions<AccountsOptions> options, ILogger<SignUpHandler> logger) : ICommandHandler<SignUpCommand, Success>
+    UserManager<AccountUser> users, CredentialTiming timing, IOptions<AccountsOptions> options, ILogger<SignUpHandler> logger) : ICommandHandler<SignUpCommand, Success>
 {
     public async Task<Result<Success>> Handle(SignUpCommand command, CancellationToken cancellationToken)
     {
@@ -22,7 +21,7 @@ internal sealed partial class SignUpHandler(
         if (await users.FindByEmailAsync(command.Email) is { } existing)
         {
             timing.HashDummy(command.Password);
-            await mailer.SendAlreadyRegisteredAsync(existing);
+            existing.RequestAlreadyRegisteredNotice();
             return Success.Value;
         }
 
@@ -36,7 +35,7 @@ internal sealed partial class SignUpHandler(
             return ValidationError.For(created.Errors.First().Code.StartsWith("Password", StringComparison.Ordinal) ? "password" : "email", created.Errors.First().Description);
         }
 
-        await confirmation.SendAsync(user, cancellationToken);
+        user.RequestConfirmation();
         Log.SignedUp(logger, user.Id);
         return Success.Value;
     }
