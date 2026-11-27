@@ -184,4 +184,32 @@ public sealed class MeTests(ApiFactory factory) : IClassFixture<ApiFactory>
         (await Delete(client, new { password = Password })).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         (await SignIn(client, email, Password, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public async Task Settings_of_a_deleted_user_with_the_old_access_token_are_401_session_ended()
+    {
+        var (client, _, _) = await SignedIn();
+        using var _ = client;
+        (await Delete(client, new { password = Password })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var response = await client.PatchAsJsonAsync("/api/me/settings", new { timezone = "Asia/Tokyo" }, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.session_ended");
+    }
+
+    [Fact]
+    public async Task Parallel_first_patches_all_succeed_and_leave_one_row()
+    {
+        var (client, _, _) = await SignedIn();
+        using var _ = client;
+        var zones = new[] { "Asia/Tokyo", "Europe/Berlin", "Asia/Seoul", "America/Lima", "Africa/Cairo", "Asia/Jakarta" };
+
+        var responses = await Task.WhenAll(zones.Select(zone => client.PatchAsJsonAsync("/api/me/settings", new { timezone = zone }, Ct)));
+
+        responses.ShouldAllBe(response => response.StatusCode == HttpStatusCode.OK);
+        var id = (await (await client.GetAsync("/api/me", Ct)).Content.ReadFromJsonAsync<Me>(Ct))!.Id;
+        (await OwnerCount("select count(*) from accounts.user_settings where user_id = @id", id)).ShouldBe(1);
+        zones.ShouldContain(await Timezone(client));
+    }
 }
