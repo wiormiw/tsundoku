@@ -1,3 +1,4 @@
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Todos;
 
 namespace Tsundoku.Api.Hosting;
@@ -19,8 +20,15 @@ internal static class ApiModules
         return app;
     }
 
+    /// <summary>Migrates every module as the owner, then makes sure the API's login role exists with its password.</summary>
     public static async Task MigrateModulesAsync(this WebApplication app)
     {
         await app.MigrateTodosAsync();
+
+        var connectionStrings = app.Configuration;
+        var owner = connectionStrings.GetConnectionString(ModulePersistence.OwnerConnectionStringName)!;
+        var login = connectionStrings.GetConnectionString(ModulePersistence.ConnectionStringName)
+            ?? throw new InvalidOperationException($"Connection string '{ModulePersistence.ConnectionStringName}' is not configured.");
+        await AppDatabaseRole.EnsureLoginAsync(owner, login, app.Lifetime.ApplicationStopping);
     }
 }

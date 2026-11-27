@@ -1,6 +1,7 @@
 using Scalar.AspNetCore;
 using Tsundoku.Api.Hosting;
 using Tsundoku.Common;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Common.Valkey;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,7 +22,10 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference().AllowAnonymous();
 }
 
-await app.MigrateModulesAsync();
+// `migrate` is the deploy step: apply the migrations and the login role, then exit without serving.
+var migrateOnly = args is ["migrate"];
+if (migrateOnly || ModulePersistence.MigratesOnStartup(app.Configuration)) await app.MigrateModulesAsync();
+if (migrateOnly) return;
 
 app.MapDefaultEndpoints();
 app.MapModules();

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Tsundoku.Common.Persistence.Outbox;
 
 namespace Tsundoku.Common.Persistence;
@@ -12,6 +13,9 @@ public static class ModulePersistence
     /// <summary>The name of the connection string. It must be the same as the database resource name in the AppHost.</summary>
     public const string ConnectionStringName = "appdb";
 
+    /// <summary>The connection string of the owner role. Only migrations use it; the API itself connects as <see cref="ConnectionStringName"/>.</summary>
+    public const string OwnerConnectionStringName = "appdb-owner";
+
     /// <summary>Registers the context, its outbox processor and its readiness check.</summary>
     public static IHostApplicationBuilder AddModuleDatabase<TDbContext>(this IHostApplicationBuilder builder, string schema)
         where TDbContext : DbContext
@@ -20,6 +24,7 @@ public static class ModulePersistence
             ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is not configured.");
         var services = builder.Services;
 
+        services.TryAddSingleton<DatabaseRoleVerdict>();
         services.AddSingleton<AuditableEntityInterceptor>();
         services.AddSingleton<OutboxInterceptor>();
         // No EnableRetryOnFailure: the outbox processor starts its own transactions, and a retrying
@@ -53,14 +58,20 @@ public static class ModulePersistence
         modelBuilder.ApplyConfiguration(new OutboxMessageConfiguration());
     }
 
+    /// <summary>True when the host applies migrations as it starts (<c>Database:MigrateOnStartup</c>: Development, tests).</summary>
+    public static bool MigratesOnStartup(IConfiguration configuration) => configuration.GetValue<bool>("Database:MigrateOnStartup");
+
     /// <summary>
-    /// Applies the pending migrations of one module when <c>Database:MigrateOnStartup</c> is true (Development, tests).
-    /// In production, run a migration bundle as a separate deploy step, with expand/contract changes (tip 28.01).
+    /// Applies the pending migrations of one module, as the owner role (<see cref="OwnerConnectionStringName"/>): the API's own role
+    /// cannot create tables, and must not own them. In production this runs as <c>migrate</c>, a separate deploy step (tip 28.01).
     /// </summary>
     public static async Task MigrateAsync<TDbContext>(this IHost host) where TDbContext : DbContext
     {
-        if (!host.Services.GetRequiredService<IConfiguration>().GetValue<bool>("Database:MigrateOnStartup")) return;
+        var owner = host.Services.GetRequiredService<IConfiguration>().GetConnectionString(OwnerConnectionStringName)
+            ?? throw new InvalidOperationException($"Connection string '{OwnerConnectionStringName}' is not configured; migrations need the owner role.");
         await using var scope = host.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<TDbContext>().Database.MigrateAsync();
+        var database = scope.ServiceProvider.GetRequiredService<TDbContext>().Database;
+        database.SetConnectionString(owner);
+        await database.MigrateAsync();
     }
 }

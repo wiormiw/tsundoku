@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security.Cryptography;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 
@@ -20,6 +22,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private RedisContainer? _valkey;
 
     public string? DockerUnavailableReason { get; private set; }
+
+    /// <summary>The container's own (owner) connection string: migrations and test set-up.</summary>
+    public string OwnerConnectionString => _postgres!.GetConnectionString();
+
+    private readonly string _appPassword = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
+
+    /// <summary>The API's connection string: the same server as the owner's, as the login role <c>tsundoku_api</c> with a random password for each run.</summary>
+    public string AppConnectionString => new NpgsqlConnectionStringBuilder(OwnerConnectionString)
+    {
+        Username = "tsundoku_api",
+        Password = _appPassword,
+    }.ConnectionString;
 
     public async ValueTask InitializeAsync()
     {
@@ -53,7 +67,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:appdb", _postgres!.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:appdb-owner", OwnerConnectionString);
+        builder.UseSetting("ConnectionStrings:appdb", AppConnectionString);
         builder.UseSetting("ConnectionStrings:valkey", _valkey!.GetConnectionString());
         builder.UseSetting("Database:MigrateOnStartup", "true");
         // The JWT options must be valid at startup, but the tests sign in with TestAuthHandler.
