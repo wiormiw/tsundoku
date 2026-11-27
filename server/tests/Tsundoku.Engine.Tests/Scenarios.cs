@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 
 namespace Tsundoku.Engine.Tests;
 
@@ -16,13 +15,6 @@ public sealed record ScenarioCheck(DateOnly Today, JsonObject Expect);
 /// <summary>The tables in <c>fixtures/engine</c>, shared with the Bun engine and the clients; read in place, never edited.</summary>
 public static class Scenarios
 {
-    public static readonly JsonSerializerOptions Strict = new(JsonSerializerDefaults.Web)
-    {
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        RespectNullableAnnotations = true,
-        RespectRequiredConstructorParameters = true,
-    };
-
     private const string GoalId = "00000000-0000-4000-8000-00000000f001";
 
     public static string Folder { get; } = FindFolder();
@@ -31,7 +23,7 @@ public static class Scenarios
         [.. Directory.EnumerateFiles(Folder, "*.json").Select(Path.GetFileName).Order(StringComparer.Ordinal).Cast<string>()];
 
     public static Scenario Load(string file) =>
-        JsonSerializer.Deserialize<Scenario>(File.ReadAllText(Path.Combine(Folder, file)), Strict)
+        JsonSerializer.Deserialize<Scenario>(File.ReadAllText(Path.Combine(Folder, file)), WireJson.Options)
         ?? throw new InvalidDataException($"{file}: empty");
 
     /// <summary>As the TS <c>expandFacts</c>: ids from the position, seq defaulting to it (from 1), received when it occurred.</summary>
@@ -50,25 +42,25 @@ public static class Scenarios
                 ["receivedAt"] = fact.OccurredAt,
                 ["data"] = JsonNode.Parse(fact.Data.GetRawText()),
             };
-            return envelope.Deserialize<Fact>(Strict) ?? throw new InvalidDataException($"{scenario.Name}: fact {index + 1} is null");
+            return envelope.Deserialize<Fact>(WireJson.Options) ?? throw new InvalidDataException($"{scenario.Name}: fact {index + 1} is null");
         })];
 
     /// <summary>The default rules with the table's overrides; an unknown rule name fails.</summary>
     public static Rules RulesOf(Scenario scenario)
     {
-        var rules = JsonSerializer.SerializeToNode(Rules.Default, Strict)!.AsObject();
+        var rules = JsonSerializer.SerializeToNode(Rules.Default, WireJson.Options)!.AsObject();
         foreach (var (name, value) in scenario.Rules ?? new Dictionary<string, double>())
         {
             if (!rules.ContainsKey(name)) throw new InvalidDataException($"{scenario.Name}: unknown rule {name}");
             rules[name] = value;
         }
-        return rules.Deserialize<Rules>(Strict)!;
+        return rules.Deserialize<Rules>(WireJson.Options)!;
     }
 
     /// <summary>The view as wire JSON: what the TS runner compares, and a deep equality for records holding lists.</summary>
-    public static JsonNode Wire(GoalStateView view) => JsonNode.Parse(JsonSerializer.Serialize(view, Strict))!;
+    public static JsonNode Wire(GoalStateView view) => JsonNode.Parse(JsonSerializer.Serialize(view, WireJson.Options))!;
 
-    public static string Text(GoalStateView view) => JsonSerializer.Serialize(view, Strict);
+    public static string Text(GoalStateView view) => JsonSerializer.Serialize(view, WireJson.Options);
 
     private static string FindFolder()
     {

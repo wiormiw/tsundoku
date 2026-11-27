@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Tsundoku.Engine.Tests;
 
 /// <summary>
@@ -61,13 +63,16 @@ public sealed class SnapshotPropertyTests
     }
 
     /// <summary>Resume from every closed day's snapshot to every later today; returns the resumes checked.</summary>
-    private static int AssertResumes(IReadOnlyList<Fact> facts, DateOnly last, Rules rules, string label)
+    private static int AssertResumes(IReadOnlyList<Fact> facts, DateOnly last, Rules rules, string label, bool throughJson = false)
     {
         var timezone = facts.OfType<Fact.GoalCreated>().Single().Data.Timezone;
         var resumes = 0;
         foreach (var closed in Fold.FoldGoal(new FoldInput(facts, last, rules)).Days.Select(d => d.Date))
         {
             var snapshot = Fold.FoldGoal(new FoldInput(facts, closed.AddDays(1), rules));
+            // P3 stores snapshots as JSON: the stored copy, read back strictly, must resume as the original does.
+            if (throughJson)
+                snapshot = JsonSerializer.Deserialize<GoalStateView>(JsonSerializer.Serialize(snapshot, WireJson.Options), WireJson.Options)!;
             var frozen = Scenarios.Text(snapshot);
             var rest = facts.Where(f => Calendar.LocalDate(f.OccurredAt, timezone) > closed).ToList();
             for (var today = closed.AddDays(1); today <= last; today = today.AddDays(1))
@@ -103,5 +108,13 @@ public sealed class SnapshotPropertyTests
     {
         var scenario = Scenarios.Load(file);
         AssertResumes(Scenarios.ExpandFacts(scenario), scenario.Checks.Max(c => c.Today), Scenarios.RulesOf(scenario), file);
+    }
+
+    [Theory]
+    [MemberData(nameof(Files))]
+    public void A_snapshot_survives_a_JSON_round_trip_and_still_resumes_to_the_full_fold(string file)
+    {
+        var scenario = Scenarios.Load(file);
+        AssertResumes(Scenarios.ExpandFacts(scenario), scenario.Checks.Max(c => c.Today), Scenarios.RulesOf(scenario), file, throughJson: true);
     }
 }

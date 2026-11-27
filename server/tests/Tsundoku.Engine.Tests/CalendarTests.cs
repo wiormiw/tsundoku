@@ -33,6 +33,7 @@ public sealed class CalendarTests
         Calendar.LocalDate(At("2026-09-06T04:00:00Z"), santiago).ShouldBe(day);
         Calendar.IsBeforeLocalMidnight(At("2026-09-06T03:59:59Z"), day, santiago).ShouldBeTrue();
         Calendar.IsBeforeLocalMidnight(At("2026-09-06T04:00:00Z"), day, santiago).ShouldBeFalse();
+        Calendar.LocalMidnight(day, santiago).ShouldBe(At("2026-09-06T04:00:00Z"));
     }
 
     // Havana falls back from 01:00 -04 to 00:00 -05 on 2026-11-01, so its midnight happens twice:
@@ -44,6 +45,7 @@ public sealed class CalendarTests
         var day = new DateOnly(2026, 11, 1);
         Calendar.IsBeforeLocalMidnight(At("2026-11-01T03:59:59Z"), day, havana).ShouldBeTrue();
         Calendar.IsBeforeLocalMidnight(At("2026-11-01T04:00:00Z"), day, havana).ShouldBeFalse();
+        Calendar.LocalMidnight(day, havana).ShouldBe(At("2026-11-01T04:00:00Z"));
     }
 
     [Fact]

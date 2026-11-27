@@ -17,7 +17,7 @@ public static class Calendar
         IsBeforeLocalMidnight(instant, date, TimeZoneInfo.FindSystemTimeZoneById(timezone));
 
     /// <inheritdoc cref="IsBeforeLocalMidnight(DateTimeOffset, DateOnly, string)"/>
-    public static bool IsBeforeLocalMidnight(DateTimeOffset instant, DateOnly date, TimeZoneInfo zone) => instant < StartOfDay(date, zone);
+    public static bool IsBeforeLocalMidnight(DateTimeOffset instant, DateOnly date, TimeZoneInfo zone) => instant < LocalMidnight(date, zone);
 
     /// <summary><c>YYYY-MM</c>, the key of a calendar month.</summary>
     public static string MonthKey(DateOnly date) => date.ToString("yyyy-MM", CultureInfo.InvariantCulture);
@@ -37,11 +37,14 @@ public static class Calendar
         return used < AllowanceCap(date, offlinePerMonthCap);
     }
 
+    /// <summary>As above, from the IANA id.</summary>
+    public static DateTimeOffset LocalMidnight(DateOnly date, string timezone) => LocalMidnight(date, TimeZoneInfo.FindSystemTimeZoneById(timezone));
+
     /// <summary>
     /// The instant local midnight starts <paramref name="date"/>, resolved like Temporal's "compatible": a midnight inside a
     /// spring-forward gap, or one that happens twice, takes the offset in force before the transition.
     /// </summary>
-    private static DateTimeOffset StartOfDay(DateOnly date, TimeZoneInfo zone)
+    public static DateTimeOffset LocalMidnight(DateOnly date, TimeZoneInfo zone)
     {
         var midnight = date.ToDateTime(TimeOnly.MinValue);
         // shortcut: assumes no other transition within a day before this one; true of every IANA zone in use.

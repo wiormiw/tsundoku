@@ -64,14 +64,14 @@ public static class Fold
                 var ending = state.Clone();
                 Debt.ApplyRatings(ending);
                 var opening = day.AddDays(1);
-                onDayClosed(BuildView(ending, opening, start, OpenDay(ending, entries.Skip(next), opening)));
+                onDayClosed(BuildView(ending, opening, start, OpenDay(ending, entries, next, opening)));
             }
         }
 
         Debt.ApplyRatings(state);
         // A resume only holds the facts after S, so the older ones' highest seq comes from the snapshot.
         state.LastSeq = Math.Max(HighestSeq(entries, state.LastClosedDate), state.LastSeq);
-        return BuildView(state, today, start, OpenDay(state, entries.Skip(next), today));
+        return BuildView(state, today, start, OpenDay(state, entries, next, today));
     }
 
     private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -81,12 +81,14 @@ public static class Fold
     /// yet (a plan approved today, a mark made today for tomorrow). They go into a copy, so the carry, and every snapshot
     /// made from it, never holds a fact the next fold takes in again (Ruling W).
     /// </summary>
-    private static FoldState OpenDay(FoldState state, IEnumerable<(Fact Fact, DateOnly Date)> rest, DateOnly today)
+    private static FoldState OpenDay(FoldState state, List<(Fact Fact, DateOnly Date)> entries, int next, DateOnly today)
     {
-        var todays = rest.Where(e => e.Date <= today).ToList();
-        if (todays.Count == 0) return state;
+        // Entries are in time order, so their dates never fall: the scan stops at the first one after today.
+        var end = next;
+        while (end < entries.Count && entries[end].Date <= today) end++;
+        if (end == next) return state;
         var open = state.Clone();
-        foreach (var entry in todays) Ingest(open, entry);
+        for (var i = next; i < end; i++) Ingest(open, entries[i]);
         return open;
     }
 
@@ -111,55 +113,61 @@ public static class Fold
     private static void Ingest(FoldState state, (Fact Fact, DateOnly Date) entry)
     {
         var (fact, date) = entry;
-        switch (fact)
+        // A switch expression with no discard arm: Fact is closed, so a new kind is CS8509 (an error) until handled here.
+        _ = fact switch
         {
-            case Fact.PlanApproved plan:
-                AddPlan(state, state.StartDate, plan.Data.Curriculum);
-                break;
-            case Fact.RevisionApproved revision:
-                // A revision governs from the day after the day it was approved.
-                AddPlan(state, date.AddDays(1), revision.Data.Curriculum);
-                break;
-            case Fact.ActivityLogged logged:
-                if (!state.DayLogs.TryGetValue(date, out var day)) state.DayLogs[date] = day = [];
-                day[logged.Data.ActivityId] = day.GetValueOrDefault(logged.Data.ActivityId) + logged.Data.Amount;
-                break;
-            case Fact.DayMarkedOffline mark:
-                Mark(state, fact.OccurredAt, mark.Data.Date, marked: true);
-                break;
-            case Fact.DayUnmarkedOffline unmark:
-                Mark(state, fact.OccurredAt, unmark.Data.Date, marked: false);
-                break;
-            case Fact.DebtRated rated:
-                state.PendingRatings.Add(rated.Data);
-                break;
+            Fact.PlanApproved plan => AddPlan(state, state.StartDate, plan.Data.Curriculum),
+            // A revision governs from the day after the day it was approved.
+            Fact.RevisionApproved revision => AddPlan(state, date.AddDays(1), revision.Data.Curriculum),
+            Fact.ActivityLogged logged => Log(state, date, logged.Data),
+            Fact.DayMarkedOffline mark => Mark(state, fact.OccurredAt, mark.Data.Date, marked: true),
+            Fact.DayUnmarkedOffline unmark => Mark(state, fact.OccurredAt, unmark.Data.Date, marked: false),
+            Fact.DebtRated rated => Rate(state, rated.Data),
             // Retro facts mean something only once the retrospective has begun; while running they are ignored (ingest
             // runs before the fact's day is closed, so the phase is the one in force that day).
-            case Fact.RetroProlonged prolonged when state.Phase == GoalPhase.Retrospective:
-                state.Controls.Add(new FoldState.ControlEvent.Prolonged(date, prolonged.Data.ExtraActiveDays));
-                break;
-            case Fact.RetroEnded when state.Phase == GoalPhase.Retrospective:
-                state.Controls.Add(new FoldState.ControlEvent.Ended(date));
-                break;
-            case Fact.RetroProlonged or Fact.RetroEnded or Fact.GoalCreated or Fact.SettingsChanged:
-                break;
-        }
+            Fact.RetroProlonged prolonged when state.Phase == GoalPhase.Retrospective =>
+                Control(state, new FoldState.ControlEvent.Prolonged(date, prolonged.Data.ExtraActiveDays)),
+            Fact.RetroEnded when state.Phase == GoalPhase.Retrospective => Control(state, new FoldState.ControlEvent.Ended(date)),
+            Fact.RetroProlonged or Fact.RetroEnded or Fact.GoalCreated or Fact.SettingsChanged => false,
+        };
     }
 
-    private static void Mark(FoldState state, DateTimeOffset occurredAt, DateOnly target, bool marked)
+    // The arms of Ingest are expressions, so each effect is a helper that says whether it changed the state.
+    private static bool Log(FoldState state, DateOnly date, Fact.ActivityLogged.Payload data)
+    {
+        if (!state.DayLogs.TryGetValue(date, out var day)) state.DayLogs[date] = day = [];
+        day[data.ActivityId] = day.GetValueOrDefault(data.ActivityId) + data.Amount;
+        return true;
+    }
+
+    private static bool Rate(FoldState state, Fact.DebtRated.Payload data)
+    {
+        state.PendingRatings.Add(data);
+        return true;
+    }
+
+    private static bool Control(FoldState state, FoldState.ControlEvent control)
+    {
+        state.Controls.Add(control);
+        return true;
+    }
+
+    private static bool Mark(FoldState state, DateTimeOffset occurredAt, DateOnly target, bool marked)
     {
         // Only a mark or unmark made before the day's local midnight counts.
-        if (!Calendar.IsBeforeLocalMidnight(occurredAt, target, state.Zone)) return;
+        if (!Calendar.IsBeforeLocalMidnight(occurredAt, target, state.Zone)) return false;
         var i = state.PendingMarks.FindIndex(m => m.Date == target);
         if (i < 0) state.PendingMarks.Add(new FoldCarry.PendingMark(target, marked));
         else state.PendingMarks[i] = state.PendingMarks[i] with { Marked = marked };
+        return true;
     }
 
     /// <summary>Inserts after every plan from the same day or earlier, so of two plans from one day the later fact governs.</summary>
-    private static void AddPlan(FoldState state, DateOnly effectiveFrom, Curriculum curriculum)
+    private static bool AddPlan(FoldState state, DateOnly effectiveFrom, Curriculum curriculum)
     {
         var at = state.Plans.FindIndex(p => p.EffectiveFrom > effectiveFrom);
         state.Plans.Insert(at < 0 ? state.Plans.Count : at, new FoldCarry.Plan(effectiveFrom, curriculum));
+        return true;
     }
 
     private static FoldCarry.Plan? PlanAt(FoldState state, DateOnly date) => state.Plans.LastOrDefault(p => p.EffectiveFrom <= date);

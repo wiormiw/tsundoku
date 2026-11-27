@@ -76,5 +76,8 @@ public class FoldBenchmarks
 
     [Benchmark] public GoalStateView YearFromSnapshot() => Fold.FoldGoal(_yearFromSnapshot);
 
+    /// <summary>The path production runs: a view handed over at every closed day.</summary>
+    [Benchmark] public int YearOnDayClosed() { var n = 0; Fold.FoldGoal(_yearFromStart with { OnDayClosed = _ => n++ }); return n; }
+
     [Benchmark] public GoalStateView YearShuffled() => Fold.FoldGoal(_yearShuffled);
 }
