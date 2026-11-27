@@ -12,6 +12,10 @@ using Tsundoku.Modules.Accounts.Features;
 using Tsundoku.Modules.Accounts.Features.OnAlreadyRegisteredNoticeRequested;
 using Tsundoku.Modules.Accounts.Features.OnConfirmationRequested;
 using Tsundoku.Modules.Accounts.Features.ConfirmEmail;
+using Tsundoku.Modules.Accounts.Features.DeleteAccount;
+using Tsundoku.Modules.Accounts.Features.GetMe;
+using Tsundoku.Modules.Accounts.Features.SignOutEverywhere;
+using Tsundoku.Modules.Accounts.Features.UpdateSettings;
 using Tsundoku.Modules.Accounts.Features.RefreshSession;
 using Tsundoku.Modules.Accounts.Features.ResendConfirmation;
 using Tsundoku.Modules.Accounts.Features.SignIn;
@@ -87,6 +91,12 @@ public static class AccountsModule
         services.AddAnonymousCommand<ResendConfirmationCommand, Success, ResendConfirmationHandler, AccountsDbContext>();
         services.AddAnonymousCommand<SignInCommand, SignInOutcome, SignInHandler, AccountsDbContext>();
         services.AddAnonymousCommand<RefreshSessionCommand, RefreshOutcome, RefreshSessionHandler, AccountsDbContext>();
+
+        services.AddValidator<UpdateSettingsCommand, UpdateSettingsCommandValidator>();
+        services.AddQuery<GetMeQuery, MeResponse, GetMeHandler, AccountsDbContext>();
+        services.AddCommand<UpdateSettingsCommand, SettingsResponse, UpdateSettingsHandler, AccountsDbContext>();
+        services.AddCommand<SignOutEverywhereCommand, Success, SignOutEverywhereHandler, AccountsDbContext>();
+        services.AddCommand<DeleteAccountCommand, DeleteAccountOutcome, DeleteAccountHandler, AccountsDbContext>();
         return builder;
     }
 
@@ -99,6 +109,12 @@ public static class AccountsModule
         ResendConfirmationEndpoint.Map(auth);
         SignInEndpoint.Map(auth);
         RefreshSessionEndpoint.Map(auth);
+
+        var me = api.MapGroup("/me").WithTags("Me");
+        GetMeEndpoint.Map(me);
+        UpdateSettingsEndpoint.Map(me);
+        SignOutEverywhereEndpoint.Map(me);
+        DeleteAccountEndpoint.Map(me);
         return api;
     }
 

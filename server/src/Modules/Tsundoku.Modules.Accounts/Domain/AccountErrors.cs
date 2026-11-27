@@ -36,4 +36,14 @@ internal static class AccountErrors
     public static UnauthorizedError SessionExpired => new("accounts.session_expired", "The session has expired.");
 
     public static UnauthorizedError RefreshReused => new("accounts.refresh_reused", "The refresh token was already used.");
+
+    public const string SessionEndedCode = "accounts.session_ended";
+    public const string ReauthenticationRequiredCode = "accounts.reauthentication_required";
+
+    // A valid access token of a user that no longer exists (deleted): it may live until it expires, so the client must sign in again.
+    public static UnauthorizedError SessionEnded => new(SessionEndedCode, "The account no longer exists. Sign in again.");
+
+    // Deleting needs proof that is fresher than a bearer token: a stolen token must not delete the account.
+    public static ValidationError ReauthenticationRequired =>
+        ValidationError.For("password", "Send your password to delete the account.", ReauthenticationRequiredCode);
 }
