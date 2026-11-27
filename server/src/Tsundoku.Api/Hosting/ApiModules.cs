@@ -18,6 +18,7 @@ internal static class ApiModules
     public static WebApplication MapModules(this WebApplication app)
     {
         var api = app.MapGroup("/api");
+        api.MapAccountsEndpoints();
         api.MapTodosEndpoints();
         return app;
     }

@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Tsundoku.Modules.Accounts.Features;
+using Tsundoku.Modules.Accounts.Persistence;
 using System.Security.Cryptography;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -20,6 +24,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private PostgreSqlContainer? _postgres;
     private RedisContainer? _valkey;
+
+    /// <summary>Every mail the API sent. It replaces the log mailer, so a test can follow a confirmation link.</summary>
+    internal CapturingEmailSender Mail { get; } = new();
 
     public string? DockerUnavailableReason { get; private set; }
 
@@ -76,9 +83,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ApiLimits:RequestsPerMinute", "100000");
         // The outbox reads often, so the tests see the events quickly.
         builder.UseSetting("Outbox:PollInterval", "00:00:00.050");
-        builder.ConfigureTestServices(services => services
-            .AddAuthentication(TestAuthHandler.SchemeName)
-            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { }));
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+            services.RemoveAll<IAccountMailer>();
+            services.RemoveAll<IEmailSender<AccountUser>>();
+            services.AddSingleton<IAccountMailer>(Mail);
+            services.AddSingleton<IEmailSender<AccountUser>>(Mail);
+        });
     }
 
     public override async ValueTask DisposeAsync()

@@ -36,6 +36,13 @@ public static class ResultHttp
         Error error => error.ToProblem(),
     };
 
+    /// <summary>An empty 202: the work continues elsewhere (a mail), and the body must not say what happened.</summary>
+    public static Results<Accepted, ProblemHttpResult> ToAccepted(this Result<Success> result) => result switch
+    {
+        Success => TypedResults.Accepted((string?)null),
+        Error error => error.ToProblem(),
+    };
+
     public static Results<Created<T>, ProblemHttpResult> ToCreated<T>(this Result<T> result, Func<T, string> location) where T : notnull =>
         result switch
         {

@@ -2,8 +2,14 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Identity;
+using Tsundoku.Common.Messaging;
 using Tsundoku.Common.Persistence;
+using Tsundoku.Modules.Accounts.Features;
+using Tsundoku.Modules.Accounts.Features.ConfirmEmail;
+using Tsundoku.Modules.Accounts.Features.ResendConfirmation;
+using Tsundoku.Modules.Accounts.Features.SignUp;
 using Tsundoku.Modules.Accounts.Persistence;
 
 namespace Tsundoku.Modules.Accounts;
@@ -56,7 +62,31 @@ public static class AccountsModule
 
         // The keys that protect the tokens live in the database, so every replica and every restart reads the same ones.
         services.AddDataProtection().SetApplicationName("tsundoku").PersistKeysToDbContext<AccountsDbContext>();
+
+        // The mailer port. Both registrations are one object, so a replacement must replace both.
+        services.AddSingleton<LogEmailSender>();
+        services.AddSingleton<IAccountMailer>(provider => provider.GetRequiredService<LogEmailSender>());
+        services.AddSingleton<IEmailSender<AccountUser>>(provider => provider.GetRequiredService<IAccountMailer>());
+        services.AddScoped<ConfirmationMail>();
+        services.AddScoped<CredentialTiming>();
+
+        services.AddValidator<SignUpCommand, SignUpCommandValidator>();
+        services.AddValidator<ResendConfirmationCommand, ResendConfirmationCommandValidator>();
+        // Anonymous: these touch only tables without an owner policy.
+        services.AddAnonymousCommand<SignUpCommand, Success, SignUpHandler, AccountsDbContext>();
+        services.AddAnonymousCommand<ConfirmEmailCommand, Success, ConfirmEmailHandler, AccountsDbContext>();
+        services.AddAnonymousCommand<ResendConfirmationCommand, Success, ResendConfirmationHandler, AccountsDbContext>();
         return builder;
+    }
+
+    /// <summary>Maps the endpoints of the module under <paramref name="api"/>.</summary>
+    public static IEndpointRouteBuilder MapAccountsEndpoints(this IEndpointRouteBuilder api)
+    {
+        var auth = api.MapGroup("/auth").WithTags("Auth");
+        SignUpEndpoint.Map(auth);
+        ConfirmEmailEndpoint.Map(auth);
+        ResendConfirmationEndpoint.Map(auth);
+        return api;
     }
 
     public static Task MigrateAccountsAsync(this IHost host) => host.MigrateAsync<AccountsDbContext>();
