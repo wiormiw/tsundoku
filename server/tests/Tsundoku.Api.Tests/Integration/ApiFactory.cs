@@ -20,7 +20,7 @@ namespace Tsundoku.Api.Tests.Integration;
 /// The real API with a temporary Postgres and Valkey in Docker. It migrates at startup, the same as Development.
 /// When Docker is not available, the integration tests are skipped. They do not fail.
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private PostgreSqlContainer? _postgres;
     private RedisContainer? _valkey;
@@ -99,5 +99,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await base.DisposeAsync();
         if (_postgres is not null) await _postgres.DisposeAsync();
         if (_valkey is not null) await _valkey.DisposeAsync();
+        GC.SuppressFinalize(this);
     }
 }

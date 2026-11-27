@@ -1,5 +1,4 @@
 using Tsundoku.Common.Domain;
-using Tsundoku.Common.Domain.Results;
 using Tsundoku.Modules.Accounts.Domain;
 
 namespace Tsundoku.Modules.Accounts.Tests;
@@ -40,7 +39,7 @@ public sealed class AccountSessionTests
         var session = NewSession();
         session.Rotate(1, Now, Expiry);
 
-        session.Rotate(1, Now, Expiry).Value.ShouldBeOfType<UnauthorizedError>().Code.ShouldBe(AccountErrors.InvalidRefreshCode);
+        session.Rotate(1, Now, Expiry).Value.ShouldBe(AccountErrors.RefreshReused);
 
         session.RevokedAt.ShouldBe(Now);
         session.Version.ShouldBe(2);
@@ -48,7 +47,7 @@ public sealed class AccountSessionTests
 
     [Fact]
     public void Rotation_at_the_expiry_instant_is_refused_without_skew() =>
-        NewSession().Rotate(1, Expiry, Expiry.AddDays(1)).Value.ShouldBeOfType<UnauthorizedError>().Message.ShouldBe(AccountErrors.SessionExpired.Message);
+        NewSession().Rotate(1, Expiry, Expiry.AddDays(1)).Value.ShouldBe(AccountErrors.SessionExpired);
 
     [Fact]
     public void A_revoked_session_does_not_rotate()
@@ -56,7 +55,7 @@ public sealed class AccountSessionTests
         var session = NewSession();
         session.Revoke(Now);
 
-        session.Rotate(1, Now, Expiry).Value.ShouldBeOfType<UnauthorizedError>().Message.ShouldBe(AccountErrors.SessionRevoked.Message);
+        session.Rotate(1, Now, Expiry).Value.ShouldBe(AccountErrors.SessionRevoked);
     }
 
     [Fact]
@@ -71,10 +70,7 @@ public sealed class AccountSessionTests
     }
 
     [Fact]
-    public void The_three_refusals_share_a_code_and_differ_in_message()
-    {
-        AccountErrors.SessionRevoked.Code.ShouldBe(AccountErrors.SessionExpired.Code);
-        AccountErrors.SessionExpired.Code.ShouldBe(AccountErrors.RefreshReused.Code);
-        new[] { AccountErrors.SessionRevoked.Message, AccountErrors.SessionExpired.Message, AccountErrors.RefreshReused.Message }.Distinct().Count().ShouldBe(3);
-    }
+    public void The_three_reasons_are_distinct_so_the_logs_can_tell_them_apart() =>
+        new[] { AccountErrors.SessionRevoked.Code, AccountErrors.SessionExpired.Code, AccountErrors.RefreshReused.Code, AccountErrors.InvalidRefreshCode }
+            .Distinct().Count().ShouldBe(4);
 }

@@ -1,8 +1,36 @@
 # Start the API (`dotnet run --project src/Tsundoku.AppHost`, or `dotnet run --project src/Tsundoku.Api`).
-# The access token comes from sign-in (the sign-up and sign-in endpoints arrive with Task 5): paste the
-# access token it returns below. Until then every call here answers 401.
+# Sign up, follow the confirmation link (Development logs it), then sign in: the calls below use its token.
 @baseUrl = http://localhost:5080
-@token = paste-the-access-token-here
+@email = me@example.test
+@password = correct horse battery staple
+@token = {{signIn.response.body.$.accessToken}}
+
+### Sign up → 202 (the confirmation link is in the log in Development)
+POST {{baseUrl}}/api/auth/sign-up
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Sign in → 200 { tokenType, accessToken, expiresIn, refreshToken }; unconfirmed → 403; wrong → 401
+# @name signIn
+POST {{baseUrl}}/api/auth/sign-in
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Refresh → 200 with new tokens. Sending the same refresh token again → 401 and the session ends.
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{signIn.response.body.$.refreshToken}}"
+}
 
 ### Liveness and readiness → 200 (no token needed)
 GET {{baseUrl}}/health/ready

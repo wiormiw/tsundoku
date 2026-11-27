@@ -12,7 +12,9 @@ using Tsundoku.Modules.Accounts.Features;
 using Tsundoku.Modules.Accounts.Features.OnAlreadyRegisteredNoticeRequested;
 using Tsundoku.Modules.Accounts.Features.OnConfirmationRequested;
 using Tsundoku.Modules.Accounts.Features.ConfirmEmail;
+using Tsundoku.Modules.Accounts.Features.RefreshSession;
 using Tsundoku.Modules.Accounts.Features.ResendConfirmation;
+using Tsundoku.Modules.Accounts.Features.SignIn;
 using Tsundoku.Modules.Accounts.Features.SignUp;
 using Tsundoku.Modules.Accounts.Persistence;
 
@@ -78,10 +80,13 @@ public static class AccountsModule
 
         services.AddValidator<SignUpCommand, SignUpCommandValidator>();
         services.AddValidator<ResendConfirmationCommand, ResendConfirmationCommandValidator>();
+        services.AddValidator<SignInCommand, SignInCommandValidator>();
         // Anonymous: these touch only tables without an owner policy.
         services.AddAnonymousCommand<SignUpCommand, Success, SignUpHandler, AccountsDbContext>();
         services.AddAnonymousCommand<ConfirmEmailCommand, Success, ConfirmEmailHandler, AccountsDbContext>();
         services.AddAnonymousCommand<ResendConfirmationCommand, Success, ResendConfirmationHandler, AccountsDbContext>();
+        services.AddAnonymousCommand<SignInCommand, SignInOutcome, SignInHandler, AccountsDbContext>();
+        services.AddAnonymousCommand<RefreshSessionCommand, RefreshOutcome, RefreshSessionHandler, AccountsDbContext>();
         return builder;
     }
 
@@ -92,6 +97,8 @@ public static class AccountsModule
         SignUpEndpoint.Map(auth);
         ConfirmEmailEndpoint.Map(auth);
         ResendConfirmationEndpoint.Map(auth);
+        SignInEndpoint.Map(auth);
+        RefreshSessionEndpoint.Map(auth);
         return api;
     }
 
