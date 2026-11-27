@@ -29,6 +29,10 @@ dotnet run --project server/src/Tsundoku.AppHost      Aspire: Postgres 18, Valke
   architecture test enforces it.
 - **Follow the template's architecture rules** (its README) and `~/Personal/GitProj/CSharp-Tips`;
   use the `csharp-15` and `dotnet-backend` skills.
+- **High-performance code on hot paths** (the fold, JSON, per-request work): `Span<T>`/`ReadOnlySpan<T>`,
+  `stackalloc` for small buffers, `ArrayPool<T>.Shared` for big temporary arrays (returned in `finally`),
+  `CollectionsMarshal.AsSpan`, `Frozen*` collections for fixed lookups, cached `JsonSerializerOptions`.
+  Measure with BenchmarkDotNet first (`CSharp-Tips` chapter 6); simple code where nothing is hot.
 - **Define a thing once; derive the rest.** No duplicated rules, types or value sets.
 - **Tunables are config, never a constant in code** (timeouts, TTLs, limits, sizes, rates): an
   options class validated at startup, with its default in one place.
