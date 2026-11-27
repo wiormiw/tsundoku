@@ -1,5 +1,7 @@
-# Local dependencies and the observability stack. `docker compose -f deploy/compose.yaml up -d
-# --wait`, then `bun run dev` on the host. Every port is loopback-only: a bare "4632:5432" binds
+# The whole stack: Postgres, Valkey, the API (with its `migrate` step) and the observability stack.
+#   cp deploy/.env.example deploy/.env   # and fill it in
+#   docker compose -f deploy/compose.yaml up -d --build --wait
+# Every port is loopback-only: a bare "4632:5432" binds
 # 0.0.0.0 and offers the database to the whole LAN.
 
 name: tsundoku
@@ -33,6 +35,48 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+  # The deploy step: every module's migrations as the owner (the postgres user), then the tsundoku_api login. Exits when done.
+  migrate:
+    build: &api-build
+      context: ../server
+      dockerfile: deploy/Dockerfile
+      target: api
+    command: ['migrate']
+    environment:
+      ConnectionStrings__appdb-owner: 'Host=postgres;Database=tsundoku;Username=postgres;Password=tsundoku'
+      ConnectionStrings__appdb: 'Host=postgres;Database=tsundoku;Username=tsundoku_api;Password=${APP_DB_PASSWORD:?set APP_DB_PASSWORD in deploy/.env}'
+      ConnectionStrings__valkey: valkey:6379
+      Accounts__PublicBaseUrl: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in deploy/.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: *api-build
+    environment:
+      # The API never gets the owner connection string: its role cannot change the schema or bypass RLS.
+      ConnectionStrings__appdb: 'Host=postgres;Database=tsundoku;Username=tsundoku_api;Password=${APP_DB_PASSWORD:?set APP_DB_PASSWORD in deploy/.env}'
+      ConnectionStrings__valkey: valkey:6379
+      Accounts__PublicBaseUrl: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in deploy/.env}
+      Accounts__SignUpEnabled: ${SIGNUP_ENABLED:-false}
+      Accounts__Google__ClientIds__0: ${GOOGLE_CLIENT_ID:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
+      OTEL_SERVICE_NAME: tsundoku-api
+    ports:
+      - '127.0.0.1:4600:8080'
+    # Longer than HostOptions.ShutdownTimeout (25 s), so in-flight requests finish before SIGKILL (tip 18.08).
+    stop_grace_period: 35s
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      valkey:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      collector:
+        condition: service_started
 
   # The app talks only to the collector, which fans out; the same topology as production.
   collector:

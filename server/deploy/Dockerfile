@@ -1,6 +1,7 @@
 # The API as a container. Build context is the template root:
 #   docker build -f deploy/Dockerfile -t tsundoku-api .
-# Migrations run as their own deploy step before the new API starts (tip 28.01), not at API startup:
+# Migrations run as their own deploy step before the new API starts (tip 28.01), not at API startup (the compose file
+# is deploy/compose.yaml at the repository root):
 # the same image with `migrate` as its argument (dotnet Tsundoku.Api.dll migrate).
 
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build

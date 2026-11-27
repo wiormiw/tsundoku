@@ -23,8 +23,8 @@ dotnet test --solution Tsundoku.slnx
 
 **Note:** `dotnet run --environment X` sets an environment variable in .NET 11. To choose the ASP.NET Core environment, set `ASPNETCORE_ENVIRONMENT`.
 
-Production-like, in containers: `cp deploy/.env.example deploy/.env`, fill it in, then `docker compose -f deploy/compose.yaml --env-file deploy/.env up --build`.
-It starts Postgres and Valkey, runs `migrate` (the API image with the argument `migrate`), then the API on 127.0.0.1:8080.
+Production-like, in containers, from the repository root: `cp deploy/.env.example deploy/.env`, fill it in, then `docker compose -f deploy/compose.yaml up -d --build --wait`.
+One stack (`deploy/compose.yaml`): Postgres, Valkey and the observability stack, then `migrate` (the API image with the argument `migrate`), then the API on 127.0.0.1:4600.
 
 ## Sign in
 
@@ -64,7 +64,7 @@ tests/
   Tsundoku.Engine.Tests/         The fold, against the fixtures
   Tsundoku.Architecture.Tests/   The rules below, checked in IL and in source files
   Tsundoku.Api.Tests/            HTTP end to end, outbox and concurrency, with Testcontainers Postgres
-deploy/                      Dockerfile (the API image, also the migrate step), compose
+deploy/                      Dockerfile (the API image, also the migrate step); the compose file is deploy/compose.yaml at the repository root
 ```
 
 ## The rules of this architecture

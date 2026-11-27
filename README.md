@@ -14,7 +14,7 @@ OpenTelemetry), with Aspire for development and the Grafana LGTM stack in produc
 server/            the API: .NET 11 solution (vertical-slice modular monolith), Aspire AppHost, tests
 fixtures/engine/   language-neutral tables: a fact log in, the expected goal state out
 fixtures/sync/     sync scenarios: client state + server responses in, client state out
-deploy/            compose: Postgres, Valkey, OpenTelemetry Collector, Tempo, Loki, Prometheus, Grafana
+deploy/            compose: Postgres, Valkey, the API and its migrate step, OpenTelemetry Collector, Tempo, Loki, Prometheus, Grafana
 ```
 
 Every implementation (the API, the Rust and Kotlin clients) runs the same fixture files.
@@ -35,10 +35,11 @@ Sign-up is closed unless `SIGNUP_ENABLED=true`: open it once to create your acco
 Every owned table is under row-level security, and the API connects as a role that is neither the owner nor BYPASSRLS.
 See `server/README.md` for the flow and for production.
 
-## Observability stack
+## The whole stack
 
 ```
-docker compose -f deploy/compose.yaml up -d --wait
+cp deploy/.env.example deploy/.env        # then fill it in
+docker compose -f deploy/compose.yaml up -d --build --wait
 ```
 
-Grafana on 127.0.0.1:4630, OTLP/gRPC on 4617, OTLP/HTTP on 4618.
+The API on 127.0.0.1:4600, Grafana on 127.0.0.1:4630, OTLP/gRPC on 4617, OTLP/HTTP on 4618.

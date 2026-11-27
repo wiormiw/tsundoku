@@ -85,7 +85,10 @@ public static class AccountsModule
         services.AddDomainEventHandler<AlreadyRegisteredNoticeRequested, AlreadyRegisteredNoticeRequestedHandler>();
         services.AddScoped<CredentialTiming>();
 
-        services.AddOptions<GoogleOptions>().BindConfiguration(GoogleOptions.Section).ValidateDataAnnotations()
+        services.AddOptions<GoogleOptions>().BindConfiguration(GoogleOptions.Section)
+            // An unset env var such as GOOGLE_CLIENT_ID binds as [""]: blank entries mean "not configured", so Google stays off.
+            .PostConfigure(google => google.ClientIds = [.. google.ClientIds.Where(id => !string.IsNullOrWhiteSpace(id))])
+            .ValidateDataAnnotations()
             .Validate(google => google.MetadataAddress is { IsAbsoluteUri: true, Scheme: "https" },
                 $"{GoogleOptions.Section}:{nameof(GoogleOptions.MetadataAddress)} must be an absolute https URL.")
             .ValidateOnStart();

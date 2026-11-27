@@ -131,6 +131,19 @@ public sealed class GoogleSignInTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task A_blank_client_id_means_Google_is_off()
+    {
+        Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");
+        using var blank = factory.WithWebHostBuilder(host => host.UseSetting("Accounts:Google:ClientIds:0", ""));
+        using var client = blank.CreateClient();
+
+        using var response = await Google(client, Mint(GoogleTokens.NewSubject(), NewEmail()));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.google_not_configured");
+    }
+
+    [Fact]
     public async Task Google_off_is_404()
     {
         Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");

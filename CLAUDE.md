@@ -45,5 +45,5 @@ dotnet run --project server/src/Tsundoku.Api -- migrate   the deploy step: migra
   on this machine (akashic-prod, old-country-local, postgres-9aff4cf4); never stop, restart, exec
   into or `down` any other container.
 
-Ports (127.0.0.1): Postgres 4632, Valkey 4679, OTLP/gRPC 4617, OTLP/HTTP 4618, Grafana 4630,
+Ports (127.0.0.1): API 4600, Postgres 4632, Valkey 4679, OTLP/gRPC 4617, OTLP/HTTP 4618, Grafana 4630,
 Prometheus 4690, Loki 4610, Tempo 4620.
