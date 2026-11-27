@@ -13,6 +13,7 @@ internal static class GoogleSignInEndpoint
     public static void Map(IEndpointRouteBuilder auth) => auth
         .MapPost("/google", Handle)
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimitPolicies.Credentials)
         .WithName("GoogleSignIn")
         .WithSummary("Sign in with a Google ID token that the app got from Google itself. Each token works once.")
         .Produces<AccessTokenResponse>()

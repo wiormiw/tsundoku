@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using StackExchange.Redis;
 
 namespace Tsundoku.Common.Valkey;
@@ -30,4 +31,15 @@ public static class ValkeyRegistration
         builder.Services.AddHealthChecks().AddCheck<ValkeyHealthCheck>(ValkeyHealthCheck.Name, tags: ["ready"], timeout: timeout);
         return builder;
     }
+
+    /// <summary>The distributed rate limits. They need <see cref="AddValkey"/> and the <see cref="TimeProvider"/> of Common.</summary>
+    public static IHostApplicationBuilder AddValkeyRateLimits(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<RateLimitOptions>().BindConfiguration(RateLimitOptions.Section).ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<ValkeyTokenBucket>();
+        return builder;
+    }
+
+    /// <summary>After authentication and authorization, which fill in the user that the limit reads.</summary>
+    public static IApplicationBuilder UseValkeyRateLimits(this IApplicationBuilder app) => app.UseMiddleware<ValkeyRateLimitMiddleware>();
 }

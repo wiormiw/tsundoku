@@ -13,6 +13,7 @@ internal static class SignInEndpoint
     public static void Map(IEndpointRouteBuilder auth) => auth
         .MapPost("/sign-in", Handle)
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimitPolicies.Credentials)
         .WithName("SignIn")
         .WithSummary("Sign in with email and password. Gives an access token and a single-use refresh token.")
         .Produces<AccessTokenResponse>()

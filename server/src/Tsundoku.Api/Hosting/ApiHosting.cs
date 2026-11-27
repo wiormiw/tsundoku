@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Tsundoku.Api.Http;
 using Tsundoku.Api.Identity;
 using Tsundoku.Common.Identity;
+using Tsundoku.Common.Valkey;
 
 namespace Tsundoku.Api.Hosting;
 
@@ -46,28 +46,8 @@ internal static class ApiHosting
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
-        // Rate limits: a token bucket for each user, or for each IP address without a user (tip 15.10).
-        services.AddRateLimiter(rates =>
-        {
-            rates.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            rates.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context => RateLimitPartition.GetTokenBucketLimiter(
-                context.User.FindFirst(UserClaims.Subject)?.Value is { } subject
-                    ? $"user:{subject}"
-                    : $"ip:{context.Connection.RemoteIpAddress}",
-                _ => new TokenBucketRateLimiterOptions
-                {
-                    TokenLimit = limits.RequestsPerMinute,
-                    TokensPerPeriod = limits.RequestsPerMinute,
-                    ReplenishmentPeriod = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0,
-                }));
-            rates.OnRejected = (rejected, _) =>
-            {
-                if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    rejected.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                return ValueTask.CompletedTask;
-            };
-        });
+        // Rate limits: a token bucket in Valkey for each user, or for each client address without a user (tip 15.10).
+        builder.AddValkeyRateLimits();
 
         // Timeouts: a slow request ends and frees its connection (tip 26.01).
         services.AddRequestTimeouts(timeouts => timeouts.DefaultPolicy = new RequestTimeoutPolicy { Timeout = limits.RequestTimeout });
@@ -91,7 +71,7 @@ internal static class ApiHosting
         app.UseStatusCodePages();
         app.UseAuthentication();
         app.UseAuthorization();
-        app.UseRateLimiter();
+        app.UseValkeyRateLimits();
         app.UseRequestTimeouts();
         return app;
     }

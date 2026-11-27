@@ -10,6 +10,7 @@ internal static class SignUpEndpoint
     public static void Map(IEndpointRouteBuilder auth) => auth
         .MapPost("/sign-up", Handle)
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimitPolicies.Credentials)
         .WithName("SignUp")
         .WithSummary("Sign up. A new and an existing email both get an empty 202; the confirmation or a notice goes by mail.")
         .ProducesValidationProblem()

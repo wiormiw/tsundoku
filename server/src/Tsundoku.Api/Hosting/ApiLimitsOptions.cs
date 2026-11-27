@@ -7,10 +7,6 @@ public sealed class ApiLimitsOptions
 {
     public const string Section = "ApiLimits";
 
-    /// <summary>Requests per minute for each user (or each IP address without a user) and each instance (tip 15.10).</summary>
-    [Range(1, 100_000)]
-    public int RequestsPerMinute { get; init; } = 300;
-
     /// <summary>The longest time that one request may run (tip 26.01).</summary>
     [Range(typeof(TimeSpan), "00:00:01", "00:10:00")]
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(10);

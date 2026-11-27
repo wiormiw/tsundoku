@@ -10,6 +10,7 @@ internal static class ResendConfirmationEndpoint
     public static void Map(IEndpointRouteBuilder auth) => auth
         .MapPost("/resend-confirmation", Handle)
         .AllowAnonymous()
+        .RequireRateLimiting(RateLimitPolicies.Credentials)
         .WithName("ResendConfirmation")
         .WithSummary("Mail the confirmation link again. Always an empty 202, whatever the address.")
         .ProducesValidationProblem();

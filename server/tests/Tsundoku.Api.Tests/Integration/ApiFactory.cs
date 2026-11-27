@@ -89,7 +89,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Accounts:PublicBaseUrl", "http://localhost");
         builder.UseSetting("Accounts:SignUpEnabled", "true");
         builder.UseSetting("Accounts:Google:ClientIds:0", GoogleTokens.ClientId);
-        builder.UseSetting("ApiLimits:RequestsPerMinute", "100000");
+        foreach (var bucket in new[] { "Credentials", "User", "Anonymous" })
+            builder.UseSetting($"RateLimits:{bucket}:TokenLimit", "100000");
         // The outbox reads often, so the tests see the events quickly.
         builder.UseSetting("Outbox:PollInterval", "00:00:00.050");
         builder.ConfigureTestServices(services =>

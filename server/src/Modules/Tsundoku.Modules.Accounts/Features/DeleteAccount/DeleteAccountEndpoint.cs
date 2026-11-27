@@ -11,6 +11,7 @@ internal static class DeleteAccountEndpoint
 {
     public static void Map(IEndpointRouteBuilder me) => me
         .MapDelete("/", Handle)
+        .RequireRateLimiting(RateLimitPolicies.Credentials)
         .WithName("DeleteAccount")
         .WithSummary("Delete the account. Needs the password again (or, for a Google-only account, a fresh ID token).")
         .ProducesProblem(StatusCodes.Status400BadRequest)
