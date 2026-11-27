@@ -21,6 +21,10 @@ internal sealed class AccountsOptions
     [Range(typeof(TimeSpan), "01:00:00", "90.00:00:00")]
     public TimeSpan RefreshTokenLifetime { get; init; } = TimeSpan.FromDays(14);
 
+    /// <summary>A longer refresh token is refused before it is decrypted. Real ones are about 1 KB.</summary>
+    [Range(512, 65536)]
+    public int RefreshTokenMaxLength { get; init; } = 4096;
+
     /// <summary>How long a confirmation link or code works.</summary>
     [Range(typeof(TimeSpan), "00:10:00", "7.00:00:00")]
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromDays(1);

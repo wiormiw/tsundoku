@@ -25,6 +25,10 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private PostgreSqlContainer? _postgres;
     private RedisContainer? _valkey;
 
+    // Set after the first server migrated: a WithWebHostBuilder child that migrated again would run role and grant DDL
+    // at the same time as another child's, and Postgres refuses that ("tuple concurrently updated").
+    private bool _migrated;
+
     /// <summary>Every mail the API sent. It replaces the log mailer, so a test can follow a confirmation link.</summary>
     internal CapturingEmailSender Mail { get; } = new();
 
@@ -60,7 +64,9 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         // Start the server (and its migrations) one time, before the tests run in parallel.
         using var warmUp = CreateClient();
+        _migrated = true;
     }
+
 
     /// <summary>A client that signs in as <paramref name="user"/>, or an anonymous client.</summary>
     public HttpClient CreateApiClient(string? user = "alice")
@@ -77,7 +83,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:appdb-owner", OwnerConnectionString);
         builder.UseSetting("ConnectionStrings:appdb", AppConnectionString);
         builder.UseSetting("ConnectionStrings:valkey", _valkey!.GetConnectionString());
-        builder.UseSetting("Database:MigrateOnStartup", "true");
+        builder.UseSetting("Database:MigrateOnStartup", _migrated ? "false" : "true");
         builder.UseSetting("Accounts:PublicBaseUrl", "http://localhost");
         builder.UseSetting("Accounts:SignUpEnabled", "true");
         builder.UseSetting("ApiLimits:RequestsPerMinute", "100000");

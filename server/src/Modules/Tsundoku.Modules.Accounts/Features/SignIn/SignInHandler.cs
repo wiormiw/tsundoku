@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tsundoku.Common.Domain;
 using Tsundoku.Common.Messaging;
@@ -31,18 +32,23 @@ internal sealed partial class SignInHandler(
             return Invalid;
         }
 
-        var checkedIn = await signIn.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: true);
+        // One attempt per user at a time, held until the commit: parallel guesses each see the count the last one wrote,
+        // instead of all reading the same count and losing increments to Identity's concurrency stamp.
+        var lockKey = $"accounts.sign_in:{user.Id}";
+        await db.Database.ExecuteSqlAsync($"select pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+        await db.Entry(user).ReloadAsync(cancellationToken);
+
+        // The failure is counted below, where its result is checked, not inside Identity where it is dropped.
+        var checkedIn = await signIn.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: false);
         if (checkedIn.IsNotAllowed) return await Unconfirmed(user, command.Password);
-        if (!checkedIn.Succeeded)
+        if (checkedIn.IsLockedOut)
         {
-            if (checkedIn.IsLockedOut)
-            {
-                // Identity refuses a locked account before hashing: hash anyway, so the time does not tell.
-                timing.VerifyDummy(command.Password);
-                Log.LockedOut(logger, user.Id);
-            }
+            // Identity refuses a locked account before hashing: hash anyway, so the time does not tell.
+            timing.VerifyDummy(command.Password);
+            Log.LockedOut(logger, user.Id);
             return Invalid;
         }
+        if (!checkedIn.Succeeded) return await CountFailure(user);
 
         var now = clock.GetUtcNow();
         var session = AccountSession.Start(new UserId(user.Id.ToString()), now + options.Value.RefreshTokenLifetime, command.IpAddress, command.UserAgent);
@@ -64,7 +70,13 @@ internal sealed partial class SignInHandler(
             return Invalid;
         }
         if (await users.CheckPasswordAsync(user, password)) return new SignInOutcome.Refused(AccountErrors.EmailNotConfirmed);
-        await users.AccessFailedAsync(user);
+        return await CountFailure(user);
+    }
+
+    private async Task<SignInOutcome> CountFailure(AccountUser user)
+    {
+        var counted = await signIn.UserManager.AccessFailedAsync(user);
+        if (!counted.Succeeded) Log.FailureNotCounted(logger, user.Id, counted.Errors.FirstOrDefault()?.Code);
         return Invalid;
     }
 
@@ -75,5 +87,8 @@ internal sealed partial class SignInHandler(
 
         [LoggerMessage(EventId = 2021, Level = LogLevel.Warning, Message = "Sign-in refused: user {UserId} is locked out")]
         public static partial void LockedOut(ILogger logger, Guid userId);
+
+        [LoggerMessage(EventId = 2022, Level = LogLevel.Error, Message = "A failed sign-in of user {UserId} was not counted: {ErrorCode}")]
+        public static partial void FailureNotCounted(ILogger logger, Guid userId, string? errorCode);
     }
 }

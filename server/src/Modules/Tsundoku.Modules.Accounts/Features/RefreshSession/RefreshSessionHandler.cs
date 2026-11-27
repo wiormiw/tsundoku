@@ -26,7 +26,9 @@ internal sealed partial class RefreshSessionHandler(
     public async Task<Result<RefreshOutcome>> Handle(RefreshSessionCommand command, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var ticket = command.RefreshToken is { Length: > 0 } token ? bearer.Get(IdentityConstants.BearerScheme).RefreshTokenProtector.Unprotect(token) : null;
+        if (command.RefreshToken is not { Length: > 0 } token) return Refused("unreadable");
+        if (token.Length > options.Value.RefreshTokenMaxLength) return Refused("too_long");
+        var ticket = bearer.Get(IdentityConstants.BearerScheme).RefreshTokenProtector.Unprotect(token);
         if (ticket?.Properties.ExpiresUtc is not { } expires) return Refused("unreadable");
         if (expires <= now) return Refused("expired");
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -71,9 +72,38 @@ public sealed class SignInTests(ApiFactory factory)
         for (var attempt = 0; attempt < 3; attempt++)
             (await SignIn(client, email, "not the password at all", Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         var locked = await SignIn(client, email, password, Ct);
+        var unknown = await SignIn(client, NewEmail(), password, Ct);
 
+        // A locked account must not be told apart from a missing one.
         locked.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        (await Code(locked)).ShouldBe("accounts.invalid_credentials");
+        (await ProblemBody(locked, Ct)).ShouldBe(await ProblemBody(unknown, Ct));
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(8)]
+    public async Task Parallel_wrong_guesses_all_count(int guesses)
+    {
+        const int maxAttempts = 3;
+        using var strict = factory.WithWebHostBuilder(host => host.UseSetting("Accounts:LockoutMaxFailedAttempts", maxAttempts.ToString(CultureInfo.InvariantCulture)));
+        var (email, password) = await SignUpConfirmedAsync(factory, Ct);
+        using var client = strict.CreateClient();
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, guesses).Select(_ => SignIn(client, email, "not the password at all", Ct)));
+
+        answers.ShouldAllBe(answer => answer.StatusCode == HttpStatusCode.Unauthorized);
+        // Exactly the limit in parallel still locks: no guess was lost to another's write.
+        (await LockoutEnd(email)).ShouldNotBeNull().ShouldBeGreaterThan(DateTime.UtcNow);
+        (await SignIn(client, email, password, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task<DateTime?> LockoutEnd(string email)
+    {
+        await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
+        await connection.OpenAsync(Ct);
+        await using var command = new NpgsqlCommand("select lockout_end from accounts.users where email = @email", connection);
+        command.Parameters.AddWithValue("email", email);
+        return await command.ExecuteScalarAsync(Ct) is DateTime end ? end : null;
     }
 
     [Fact]

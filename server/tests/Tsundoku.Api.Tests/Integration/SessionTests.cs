@@ -120,4 +120,40 @@ public sealed class SessionTests(ClockApiFactory factory) : IClassFixture<ClockA
         responses.Count(response => response.StatusCode == HttpStatusCode.OK).ShouldBe(1);
         responses.ShouldContain(response => response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Conflict);
     }
+
+    [Fact]
+    public async Task An_access_token_is_not_a_refresh_token()
+    {
+        var (client, _, tokens) = await SignedIn();
+        using var _ = client;
+
+        var response = await Refresh(client, tokens.AccessToken, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await ProblemBody(response, Ct)).ShouldContain("accounts.invalid_refresh");
+    }
+
+    [Fact]
+    public async Task A_refresh_token_is_not_an_access_token()
+    {
+        var (client, _, tokens) = await SignedIn();
+        using var _ = client;
+
+        (await GetLists(client, tokens.RefreshToken, Ct)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task An_oversized_refresh_token_gets_the_same_401_without_being_decrypted()
+    {
+        var (client, _, tokens) = await SignedIn();
+        using var _ = client;
+        tokens.RefreshToken.Length.ShouldBeLessThan(Options.RefreshTokenMaxLength);
+
+        var oversized = await Refresh(client, new string('A', Options.RefreshTokenMaxLength + 1), Ct);
+        var garbage = await Refresh(client, "not-a-token", Ct);
+
+        oversized.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await ProblemBody(oversized, Ct)).ShouldBe(await ProblemBody(garbage, Ct));
+        factory.Logs.Messages.ShouldContain("Refresh refused: too_long");
+    }
 }
