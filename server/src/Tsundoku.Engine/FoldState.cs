@@ -18,14 +18,14 @@ internal sealed class FoldState
     /// <summary>A day just closed, with what the debt step needs: its active-day number (a skipped day's too), what was due, every amount logged.</summary>
     internal sealed record ClosedDay(DateOnly Date, DayStatus Status, int K, IReadOnlyList<Classify.DueFloor> Due, IReadOnlyDictionary<Guid, double>? Logged);
 
-    private FoldState(Rules rules, GoalPhase phase, FoldCarry carry, IEnumerable<GoalStateView.GoalDay> days, IEnumerable<GoalStateView.Bankruptcy> bankruptcies)
+    private FoldState(Rules rules, GoalPhase phase, FoldCarry carry, IEnumerable<GoalStateView.GoalDay> days, IEnumerable<GoalStateView.Bankruptcy> bankruptcies, TimeZoneInfo zone)
     {
         Rules = rules;
         Phase = phase;
         RulesKey = carry.RulesKey;
         StartDate = carry.StartDate;
         Timezone = carry.Timezone;
-        Zone = TimeZoneInfo.FindSystemTimeZoneById(carry.Timezone);
+        Zone = zone;
         RangeActiveDays = carry.RangeActiveDays;
         OfflinePerMonthCap = carry.OfflinePerMonthCap;
         Plans = [.. carry.Plans];
@@ -85,18 +85,18 @@ internal sealed class FoldState
             area.Id, rules.BaseMultiplier, rules.BaseMultiplier, ReplanScale: 1, NewDebtYesterday: false, PaidDebtOnLastClosed: false));
         var carry = new FoldCarry(Engine.Rules.Key(rules), data.StartDate, data.Timezone, data.RangeActiveDays, data.Caps.OfflinePerMonth,
             [], [], [], [], [.. areas], 0, 0, 0, 0, 0, [], null, 0);
-        return new FoldState(rules, GoalPhase.Running, carry, [], []);
+        return new FoldState(rules, GoalPhase.Running, carry, [], [], TimeZoneInfo.FindSystemTimeZoneById(data.Timezone));
     }
 
     /// <summary>The state a snapshot stands for; the snapshot itself is never touched.</summary>
     public static FoldState Resume(GoalStateView snapshot, Rules rules) =>
         snapshot.Carry.RulesKey == Engine.Rules.Key(rules)
-            ? new FoldState(rules, snapshot.Phase, snapshot.Carry, snapshot.Days, snapshot.Bankruptcies)
+            ? new FoldState(rules, snapshot.Phase, snapshot.Carry, snapshot.Days, snapshot.Bankruptcies, TimeZoneInfo.FindSystemTimeZoneById(snapshot.Carry.Timezone))
             : throw new ArgumentException("foldGoal: the snapshot was computed under other rules; fold from scratch", nameof(snapshot));
 
     public FoldState Clone()
     {
-        var copy = new FoldState(Rules, Phase, ToCarry(), Days, Bankruptcies);
+        var copy = new FoldState(Rules, Phase, ToCarry(), Days, Bankruptcies, Zone);
         foreach (var (date, logs) in DayLogs) copy.DayLogs[date] = new Dictionary<Guid, double>(logs);
         copy.Controls.AddRange(Controls);
         return copy;

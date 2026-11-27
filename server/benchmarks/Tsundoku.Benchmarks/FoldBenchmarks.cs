@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using BenchmarkDotNet.Attributes;
 using Tsundoku.Engine;
 using Tsundoku.Engine.Tests;
@@ -14,6 +15,7 @@ public class FoldBenchmarks
     private FoldInput _fixture = null!;
     private FoldInput _yearFromStart = null!;
     private FoldInput _yearFromSnapshot = null!;
+    private FoldInput _yearShuffled = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -25,6 +27,10 @@ public class FoldBenchmarks
         var today = start.AddDays(365);
         var facts = Year(start);
         _yearFromStart = new FoldInput(facts, today, Rules.Default);
+        // The same year in arrival order scrambled: the case the already-ordered check cannot skip.
+        var scrambled = facts.ToList();
+        new Random(7).Shuffle(CollectionsMarshal.AsSpan(scrambled));
+        _yearShuffled = new FoldInput(scrambled, today, Rules.Default);
         // Snapshot after day 300; the resumed fold holds only the later facts.
         var closed = start.AddDays(299);
         var snapshot = Fold.FoldGoal(new FoldInput(facts, closed.AddDays(1), Rules.Default));
@@ -69,4 +75,6 @@ public class FoldBenchmarks
     [Benchmark] public GoalStateView YearFromStart() => Fold.FoldGoal(_yearFromStart);
 
     [Benchmark] public GoalStateView YearFromSnapshot() => Fold.FoldGoal(_yearFromSnapshot);
+
+    [Benchmark] public GoalStateView YearShuffled() => Fold.FoldGoal(_yearShuffled);
 }
