@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Fold benchmarks (BenchmarkDotNet). Not a test: run with `dotnet run in Release, project benchmarks/Tsundoku.Benchmarks`. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tsundoku.Engine\Tsundoku.Engine.csproj" />
+    <PackageReference Include="BenchmarkDotNet" />
+    <!-- The scenario loader, shared with the engine tests rather than copied. -->
+    <Compile Include="..\..\tests\Tsundoku.Engine.Tests\Scenarios.cs" Link="Scenarios.cs" />
+  </ItemGroup>
+</Project>

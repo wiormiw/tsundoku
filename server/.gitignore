@@ -7,3 +7,4 @@ TestResults/
 .idea/
 .DS_Store
 deploy/.env
+BenchmarkDotNet.Artifacts/

@@ -22,16 +22,21 @@ public static class Schedule
     public static IReadOnlyList<DueActivity> DueActivities(Curriculum curriculum, int k, DateOnly date)
     {
         var weekday = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
-        return [.. curriculum.Areas
-            .Select(area => (area, milestone: MilestoneAt(area, k)))
-            .Where(pair => pair.milestone is not null)
-            .SelectMany(pair => pair.milestone!.Activities
-                .Where(activity => activity.Cadence switch
+        var due = new List<DueActivity>();
+        foreach (var area in curriculum.Areas)
+        {
+            if (MilestoneAt(area, k) is not { } milestone) continue;
+            foreach (var activity in milestone.Activities)
+            {
+                var isDue = activity.Cadence switch
                 {
                     Cadence.Daily => true,
                     Cadence.Weekly weekly => weekly.Weekdays.Contains(weekday),
-                })
-                .Select(activity => new DueActivity(pair.area.Id, activity, pair.milestone!.Id)))];
+                };
+                if (isDue) due.Add(new DueActivity(area.Id, activity, milestone.Id));
+            }
+        }
+        return due;
     }
 
     /// <summary>A floor times a replan scale, rounded up and at least 1.</summary>

@@ -20,6 +20,15 @@ internal static class Debt
     private static double Outstanding(FoldState state, Guid activityId) =>
         state.Debt.Where(d => d.ActivityId == activityId).Sum(d => d.Amount);
 
+    private static int FloorOf(IReadOnlyList<Classify.DueFloor> due, Guid activityId)
+    {
+        foreach (var d in due)
+        {
+            if (d.ActivityId == activityId) return d.Floor;
+        }
+        return 0;
+    }
+
     private static bool Owes(FoldState state, Guid areaId) => state.Debt.Any(d => d.AreaId == areaId);
 
     /// <summary>Today's asks: each due floor plus the debt it carries in, capped at <c>DailyCapRatio</c> of the floor.</summary>
@@ -55,26 +64,30 @@ internal static class Debt
         var due = offline ? [] : day.Due;
         double LoggedFor(Guid activityId) => day.Logged?.GetValueOrDefault(activityId) ?? 0;
 
-        var paid = new HashSet<Guid>();
-        foreach (var (activityId, amount) in day.Logged ?? new Dictionary<Guid, double>())
+        // Most days pay nothing, so the set is made on the first payment.
+        HashSet<Guid>? paid = null;
+        if (day.Logged is not null)
         {
-            var excess = amount - (due.FirstOrDefault(d => d.ActivityId == activityId)?.Floor ?? 0);
-            for (var i = 0; i < state.Debt.Count; i++)
+            foreach (var (activityId, amount) in day.Logged)
             {
-                if (excess <= Epsilon) break;
-                var item = state.Debt[i];
-                if (item.ActivityId != activityId) continue;
-                var pay = Math.Min(excess, item.Amount);
-                state.Debt[i] = item with { Amount = Round(item.Amount - pay) };
-                excess -= pay;
-                paid.Add(item.AreaId);
+                var excess = amount - FloorOf(due, activityId);
+                for (var i = 0; i < state.Debt.Count; i++)
+                {
+                    if (excess <= Epsilon) break;
+                    var item = state.Debt[i];
+                    if (item.ActivityId != activityId) continue;
+                    var pay = Math.Min(excess, item.Amount);
+                    state.Debt[i] = item with { Amount = Round(item.Amount - pay) };
+                    excess -= pay;
+                    (paid ??= []).Add(item.AreaId);
+                }
             }
         }
         state.Debt.RemoveAll(item => item.Amount <= Epsilon);
 
         for (var i = 0; i < state.Areas.Count; i++)
         {
-            var area = state.Areas[i] with { PaidDebtOnLastClosed = paid.Contains(state.Areas[i].AreaId) };
+            var area = state.Areas[i] with { PaidDebtOnLastClosed = paid?.Contains(state.Areas[i].AreaId) ?? false };
             // Paying an area's debt off puts its multiplier back to base.
             if (area.PaidDebtOnLastClosed && !Owes(state, area.AreaId)) area = area with { Multiplier = area.Base };
             state.Areas[i] = area;
@@ -84,16 +97,21 @@ internal static class Debt
         for (var i = 0; i < state.Areas.Count; i++)
         {
             var area = state.Areas[i];
-            var shortOnes = due.Where(d => d.AreaId == area.AreaId && d.Floor - LoggedFor(d.ActivityId) > 0).ToList();
-            if (shortOnes.Count > 0 && area.NewDebtYesterday)
+            var anyShort = false;
+            foreach (var d in due)
+            {
+                if (d.AreaId == area.AreaId && d.Floor - LoggedFor(d.ActivityId) > 0) anyShort = true;
+            }
+            if (anyShort && area.NewDebtYesterday)
                 area = area with { Multiplier = Round(Math.Min(rules.MultiplierMax, area.Multiplier + rules.EscalationStep)) };
-            foreach (var d in shortOnes)
+            foreach (var d in due)
             {
                 var shortfall = d.Floor - LoggedFor(d.ActivityId);
+                if (d.AreaId != area.AreaId || shortfall <= 0) continue;
                 state.Debt.Add(new FoldCarry.DebtItem(d.ActivityId, area.AreaId,
                     Math.Ceiling(shortfall * area.Multiplier - Epsilon), day.K, day.K + rules.DueWindowDays));
             }
-            state.Areas[i] = area with { NewDebtYesterday = shortOnes.Count > 0 };
+            state.Areas[i] = area with { NewDebtYesterday = anyShort };
         }
     }
 

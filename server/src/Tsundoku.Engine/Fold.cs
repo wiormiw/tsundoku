@@ -23,7 +23,7 @@ public static class Fold
             : FoldState.Resume(snapshot, input.Rules);
         var today = input.Today;
         var start = state.StartDate;
-        var entries = Ordered(input.Facts, state.Timezone);
+        var entries = Ordered(input.Facts, state.Zone);
         var resumedAfter = snapshot is null ? null : state.LastClosedDate;
         if (resumedAfter is { } s && entries.FirstOrDefault(e => e.Date <= s) is { Fact: { } late } lateEntry)
         {
@@ -91,8 +91,18 @@ public static class Fold
     }
 
     /// <summary>Facts in fold order (occurredAt, then seq; stable, as JS sort is), each with its local date.</summary>
-    private static List<(Fact Fact, DateOnly Date)> Ordered(IEnumerable<Fact> facts, string timezone) =>
-        [.. facts.OrderBy(f => f.OccurredAt).ThenBy(f => f.Seq).Select(f => (f, Calendar.LocalDate(f.OccurredAt, timezone)))];
+    private static List<(Fact Fact, DateOnly Date)> Ordered(IReadOnlyList<Fact> facts, TimeZoneInfo zone)
+    {
+        // A synced log arrives in order already, and then no sort (and no key arrays) is needed.
+        var sorted = true;
+        for (var i = 1; i < facts.Count && sorted; i++)
+            sorted = facts[i - 1].OccurredAt < facts[i].OccurredAt
+                || (facts[i - 1].OccurredAt == facts[i].OccurredAt && facts[i - 1].Seq <= facts[i].Seq);
+        var ordered = sorted ? facts : [.. facts.OrderBy(f => f.OccurredAt).ThenBy(f => f.Seq)];
+        var entries = new List<(Fact, DateOnly)>(ordered.Count);
+        foreach (var fact in ordered) entries.Add((fact, Calendar.LocalDate(fact.OccurredAt, zone)));
+        return entries;
+    }
 
     private static long HighestSeq(IEnumerable<(Fact Fact, DateOnly Date)> entries, DateOnly? through) =>
         through is { } last ? entries.Where(e => e.Date <= last).Select(e => e.Fact.Seq).DefaultIfEmpty(0).Max() : 0;
@@ -139,7 +149,7 @@ public static class Fold
     private static void Mark(FoldState state, DateTimeOffset occurredAt, DateOnly target, bool marked)
     {
         // Only a mark or unmark made before the day's local midnight counts.
-        if (!Calendar.IsBeforeLocalMidnight(occurredAt, target, state.Timezone)) return;
+        if (!Calendar.IsBeforeLocalMidnight(occurredAt, target, state.Zone)) return;
         var i = state.PendingMarks.FindIndex(m => m.Date == target);
         if (i < 0) state.PendingMarks.Add(new FoldCarry.PendingMark(target, marked));
         else state.PendingMarks[i] = state.PendingMarks[i] with { Marked = marked };
@@ -155,20 +165,32 @@ public static class Fold
     private static FoldCarry.Plan? PlanAt(FoldState state, DateOnly date) => state.Plans.LastOrDefault(p => p.EffectiveFrom <= date);
 
     /// <summary>What is due on <paramref name="date"/> (active-day number <paramref name="k"/>), floors scaled by each area's replan scale.</summary>
-    private static List<Classify.DueFloor> DueOn(FoldState state, DateOnly date, int k) =>
-        PlanAt(state, date) is { } plan
-            ? [.. Schedule.DueActivities(plan.Curriculum, k, date).Select(d => new Classify.DueFloor(
-                d.AreaId,
-                d.Activity.Id,
-                Schedule.ScaledFloor(d.Activity.Floor, state.Areas.FirstOrDefault(a => a.AreaId == d.AreaId)?.ReplanScale ?? 1)))]
-            : [];
+    private static List<Classify.DueFloor> DueOn(FoldState state, DateOnly date, int k)
+    {
+        var floors = new List<Classify.DueFloor>();
+        if (PlanAt(state, date) is not { } plan) return floors;
+        foreach (var d in Schedule.DueActivities(plan.Curriculum, k, date))
+        {
+            var scale = 1.0;
+            foreach (var area in state.Areas)
+            {
+                if (area.AreaId != d.AreaId) continue;
+                scale = area.ReplanScale;
+                break;
+            }
+            floors.Add(new Classify.DueFloor(d.AreaId, d.Activity.Id, Schedule.ScaledFloor(d.Activity.Floor, scale)));
+        }
+        return floors;
+    }
 
     /// <summary>The index of <paramref name="date"/>'s month in the usage, adding it at 0 on first sight (the view lists it then).</summary>
     private static int MonthEntry(FoldState state, DateOnly date)
     {
         var month = Calendar.MonthKey(date);
-        var i = state.MonthUsage.FindIndex(m => m.Month == month);
-        if (i >= 0) return i;
+        for (var i = 0; i < state.MonthUsage.Count; i++)
+        {
+            if (state.MonthUsage[i].Month == month) return i;
+        }
         state.MonthUsage.Add(new MonthUsage(month, 0));
         return state.MonthUsage.Count - 1;
     }
@@ -191,7 +213,9 @@ public static class Fold
             var k = state.ActiveDaysUsed;
             var due = DueOn(state, date, k);
             var marked = state.PendingMarks.FirstOrDefault(m => m.Date == date)?.Marked ?? false;
-            var status = Classify.Day(marked, HasRoom(state, date), logged, due);
+            // MonthEntry just made the month's entry, so the room is read from it, not looked up again by key.
+            var hasRoom = state.MonthUsage[month].Used < Calendar.AllowanceCap(date, state.OfflinePerMonthCap);
+            var status = Classify.Day(marked, hasRoom, logged, due);
             closed = new FoldState.ClosedDay(date, status, k, due, logged);
             if (status is DayStatus.Offline or DayStatus.Skipped)
             {
@@ -207,7 +231,7 @@ public static class Fold
             }
             if (state.ActiveDaysUsed >= state.RangeActiveDays + state.ProlongedDays) state.Phase = GoalPhase.Retrospective;
         }
-        state.PendingMarks = [.. state.PendingMarks.Where(m => m.Date > date)];
+        state.PendingMarks.RemoveAll(m => m.Date <= date);
         state.DayLogs.Remove(date);
         state.LastClosedDate = date;
         return closed;

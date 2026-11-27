@@ -15,6 +15,9 @@
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/Tsundoku.Modules.Todos/Tsundoku.Modules.Todos.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Tsundoku.Benchmarks/Tsundoku.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tsundoku.Api.Tests/Tsundoku.Api.Tests.csproj" />
     <Project Path="tests/Tsundoku.Architecture.Tests/Tsundoku.Architecture.Tests.csproj" />

@@ -25,6 +25,7 @@ internal sealed class FoldState
         RulesKey = carry.RulesKey;
         StartDate = carry.StartDate;
         Timezone = carry.Timezone;
+        Zone = TimeZoneInfo.FindSystemTimeZoneById(carry.Timezone);
         RangeActiveDays = carry.RangeActiveDays;
         OfflinePerMonthCap = carry.OfflinePerMonthCap;
         Plans = [.. carry.Plans];
@@ -58,6 +59,9 @@ internal sealed class FoldState
     public string RulesKey { get; }
     public DateOnly StartDate { get; }
     public string Timezone { get; }
+
+    /// <summary>The goal's zone, resolved once per state (a clone shares it).</summary>
+    public TimeZoneInfo Zone { get; }
     public int RangeActiveDays { get; }
     public int? OfflinePerMonthCap { get; }
     public List<FoldCarry.Plan> Plans { get; }

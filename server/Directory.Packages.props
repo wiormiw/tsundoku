@@ -39,6 +39,9 @@
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Valkey" Version="13.6.5" />
 
+    <!-- Benchmarks -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+
     <!-- Tests -->
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics" Version="11.0.0" />

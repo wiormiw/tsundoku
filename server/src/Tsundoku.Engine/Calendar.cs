@@ -6,12 +6,18 @@ namespace Tsundoku.Engine;
 public static class Calendar
 {
     /// <summary>The goal's local date for an instant.</summary>
-    public static DateOnly LocalDate(DateTimeOffset instant, string timezone) =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, TimeZoneInfo.FindSystemTimeZoneById(timezone)).DateTime);
+    public static DateOnly LocalDate(DateTimeOffset instant, string timezone) => LocalDate(instant, TimeZoneInfo.FindSystemTimeZoneById(timezone));
+
+    /// <summary>As above, for a zone the caller resolved once (a fold resolves its goal's zone once, not per fact).</summary>
+    public static DateOnly LocalDate(DateTimeOffset instant, TimeZoneInfo zone) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, zone).DateTime);
 
     /// <summary>Whether an instant is before <paramref name="date"/> 00:00 in the timezone: the deadline for an offline mark.</summary>
     public static bool IsBeforeLocalMidnight(DateTimeOffset instant, DateOnly date, string timezone) =>
-        instant < StartOfDay(date, TimeZoneInfo.FindSystemTimeZoneById(timezone));
+        IsBeforeLocalMidnight(instant, date, TimeZoneInfo.FindSystemTimeZoneById(timezone));
+
+    /// <inheritdoc cref="IsBeforeLocalMidnight(DateTimeOffset, DateOnly, string)"/>
+    public static bool IsBeforeLocalMidnight(DateTimeOffset instant, DateOnly date, TimeZoneInfo zone) => instant < StartOfDay(date, zone);
 
     /// <summary><c>YYYY-MM</c>, the key of a calendar month.</summary>
     public static string MonthKey(DateOnly date) => date.ToString("yyyy-MM", CultureInfo.InvariantCulture);
