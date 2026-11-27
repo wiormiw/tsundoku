@@ -10,8 +10,10 @@ A feature is one folder inside its module, not a file in each of four layer proj
 ## Run it
 
 ```bash
-# 1. Development: Postgres in a container, the API, and the Aspire dashboard.
+# 1. Development: Postgres and Valkey in containers, the API, and the Aspire dashboard.
+#    The first password is the database owner (migrations), the second is the tsundoku_api login the API runs as.
 dotnet user-secrets set Parameters:postgres-password <password> --project src/Tsundoku.AppHost
+dotnet user-secrets set Parameters:app-db-password <password> --project src/Tsundoku.AppHost
 dotnet run --project src/Tsundoku.AppHost
 
 
@@ -22,6 +24,16 @@ dotnet test --solution Tsundoku.slnx
 **Note:** `dotnet run --environment X` sets an environment variable in .NET 11. To choose the ASP.NET Core environment, set `ASPNETCORE_ENVIRONMENT`.
 
 Production-like, in containers: `cp deploy/.env.example deploy/.env`, fill it in, then `docker compose -f deploy/compose.yaml --env-file deploy/.env up --build`.
+It starts Postgres and Valkey, runs `migrate` (the API image with the argument `migrate`), then the API on 127.0.0.1:8080.
+
+## Sign in
+
+The API needs three connection strings: `appdb-owner` (the database owner: migrations, roles, grants), `appdb` (the `tsundoku_api` login: neither the owner nor BYPASSRLS, and readiness refuses an unsafe role) and `valkey`.
+
+1. Create your account: sign-up is closed by default (`Accounts:SignUpEnabled`, env `SIGNUP_ENABLED`). Set it true once, call `POST /api/auth/sign-up`, then set it back. In Development it is on.
+2. The mail is only logged for now: find the confirmation link in the API log and open it (outside Development, sign-up enabled with the log mailer fails startup).
+3. Sign in with `src/Tsundoku.Api/Tsundoku.Api.http` (`POST /api/auth/sign-in`): the bearer access token goes in `Authorization`, and `/api/auth/refresh` gives new tokens (a refresh token works once).
+4. Google: the client signs in with Google itself and posts the ID token to `POST /api/auth/google`. Set the accepted audiences in `Accounts:Google:ClientIds` (env `GOOGLE_CLIENT_ID`).
 
 ## Layout
 
@@ -35,8 +47,9 @@ src/
                              outbox (generic over the module context), health check, migration helper
     Identity/                ICurrentUser
     Http/                    ResultHttp: Result → problem details
-    Valkey/                  One multiplexer and its health check
+    Valkey/                  One multiplexer, its health check, the shared token-bucket rate limits
   Modules/
+    Tsundoku.Modules.Accounts/ Identity users, bearer and refresh tokens, sessions, Google sign-in, user settings (schema "accounts")
     Tsundoku.Modules.Todos/  The sample module (the goals module replaces it)
       TodosModule.cs         The ONLY public type: AddTodosModule, MapTodosEndpoints, MigrateTodosAsync
       Domain/                TodoList, TodoItem, Title, ids, events, errors
@@ -51,7 +64,7 @@ tests/
   Tsundoku.Engine.Tests/         The fold, against the fixtures
   Tsundoku.Architecture.Tests/   The rules below, checked in IL and in source files
   Tsundoku.Api.Tests/            HTTP end to end, outbox and concurrency, with Testcontainers Postgres
-deploy/                      Dockerfile (API + migration bundle), compose
+deploy/                      Dockerfile (the API image, also the migrate step), compose
 ```
 
 ## The rules of this architecture
@@ -60,6 +73,8 @@ deploy/                      Dockerfile (API + migration bundle), compose
 - **A module has one public type**, `<Name>Module`. Everything else is `internal`, so the compiler enforces the boundary.
 - **A module owns its data:** one `DbContext`, one schema, its own migration history and its own `outbox_messages` table in that schema.
 - **The module domain is plain C#** on top of Common: it uses no EF Core, ASP.NET Core or FluentValidation, and not the module's `Features` or `Persistence`.
+- **Row-level security guards every owned table.** An owned table has a `user_id` column and `AddOwnerPolicy` in its migration. The API role is not the owner, so the policy binds it. A handler reaches the table only through the pipeline: the transaction decorator sets `app.user_id` with `set_config(..., true)` from the authenticated user, and Postgres clears it at commit. A query uses `AddQuery<…, TDbContext>` (it gets a transaction too). A use case with no signed-in user (sign-up, sign-in) uses `AddAnonymousCommand` and may touch only the RLS-exempt auth tables.
+- **The API role is not the owner.** Migrations run as the owner (`appdb-owner`); the API runs as `tsundoku_api`, which gets only DML through `GrantAppRole`.
 - **No repositories.** Handlers inject the module context. A command loads the aggregate with the owner in the lookup (`SingleOrDefaultAsync(l => l.Id == id && l.OwnerId == owner)`), so another user's list is a 404 (tip 19.05). A query projects to DTOs with `AsNoTracking`. A query moves to its own class only when two slices use it.
 - **Handlers never save.** The unit-of-work decorator saves one time, only after a success, and maps `DbUpdateConcurrencyException` to `ConcurrencyException` (409). After a refusal nothing is saved. The tests fail when a handler calls `SaveChanges`.
 - **Commands return only an id or `Success`.** Queries never load an aggregate to change it.
@@ -89,7 +104,7 @@ An event payload must stay readable by the next version of the app, so add prope
    - `<UseCase>Command` or `<UseCase>Query`, its validator, and its request and response records
    - `<UseCase>Handler`, `internal sealed`, that uses the module context
    - `<UseCase>Endpoint`: use `ToOk`, `ToCreated` or `ToNoContent`
-3. Add the registration lines in `<Name>Module.AddTodosModule`: `AddCommand<…, TodosDbContext>()` or `AddQuery<…>()`, plus `AddValidator<…>()`, and the endpoint line in `MapTodosEndpoints`.
+3. Add the registration lines in `<Name>Module.AddTodosModule`: `AddCommand<…, TodosDbContext>()`, `AddQuery<…, TodosDbContext>()` or `AddAnonymousCommand<…>()`, plus `AddValidator<…>()`, and the endpoint line in `MapTodosEndpoints`.
 4. When the model changes, from `server/`:
    `dotnet ef migrations add <Name> --project src/Modules/Tsundoku.Modules.Todos --startup-project src/Modules/Tsundoku.Modules.Todos --output-dir Persistence/Migrations`
 
@@ -98,13 +113,15 @@ An event payload must stay readable by the next version of the app, so add prope
 1. Make `src/Modules/Tsundoku.Modules.<Name>` (copy the csproj of Todos), with `<Name>Module` as its only public type, a `DbContext` that calls `ModulePersistence.ConfigureModel` and `ConfigureConventions`, and its own schema.
 2. In `<Name>Module.Add<Name>Module` call `builder.AddModuleDatabase<TContext>("<schema>")`, then register its use cases.
 3. Add one line each to `AddModules`, `MapModules` and `MigrateModulesAsync` in `Tsundoku.Api/Hosting/ApiModules.cs`, the project to `Tsundoku.slnx`, and the assembly to `Modules` in the architecture tests.
-4. Add its project and a migration bundle step to `deploy/Dockerfile`, and make its first migration with the command above.
+4. Add its project file to `deploy/Dockerfile` (the restore layer). There is no bundle: its first migration calls `GrantAppRole(schema)`, and `migrate` runs it with the others.
 
 ## Before production
 
 - [ ] Set `ApiLimits:KnownProxies` to the address of your reverse proxy.
-- [ ] Review `RateLimits:Credentials`, `RateLimits:User` and `RateLimits:Anonymous` (`TokenLimit` and `ReplenishmentPeriod`). The buckets live in Valkey and are shared by every instance (tip 15.10); `RateLimits:Ipv6PrefixLength` sets how many bits of an IPv6 address make one client.
-- [ ] Run the migration bundle (`--target migrate`) as a deploy step, with expand/contract changes (tip 28.01).
+- [ ] Review `RateLimits:Credentials`, `RateLimits:User` and `RateLimits:Anonymous` (`TokenLimit` and `ReplenishmentPeriod`). `RateLimits:Ipv6PrefixLength` sets how many bits of an IPv6 address make one client.
+- [ ] Run `dotnet Tsundoku.Api.dll migrate` (the compose `migrate` service) as a deploy step, with expand/contract changes (tip 28.01).
+- [ ] Back up `accounts.data_protection_keys`: without the key ring every issued token and confirmation link stops working.
+- [ ] Rate limits are shared in Valkey now, not per instance. Valkey is ephemeral here: a restart resets the buckets, and the limiter fails open.
 - [ ] Monitor the outbox: alert, in the outbox table of each module, on rows where `processed_at IS NULL AND attempts >= MaxAttempts` (dead letters), and on old unprocessed rows.
 - [ ] Delete processed outbox rows after some days, with a scheduled job.
 - [ ] Set `OTEL_EXPORTER_OTLP_ENDPOINT` and add alerts on the 5xx rate and `app.use_case.duration`.

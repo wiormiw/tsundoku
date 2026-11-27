@@ -23,9 +23,17 @@ Every implementation (the API, the Rust and Kotlin clients) runs the same fixtur
 
 ```
 dotnet user-secrets set Parameters:postgres-password <password> --project server/src/Tsundoku.AppHost
+dotnet user-secrets set Parameters:app-db-password <password> --project server/src/Tsundoku.AppHost
 dotnet run --project server/src/Tsundoku.AppHost      # Postgres, Valkey, the API and the Aspire dashboard
 cd server && dotnet test --solution Tsundoku.slnx       # from server/; Docker must run for the integration tests
 ```
+
+## Auth
+
+Email and password (with email confirmation) and Google sign-in by ID token; the API issues bearer and single-use refresh tokens.
+Sign-up is closed unless `SIGNUP_ENABLED=true`: open it once to create your account, then close it.
+Every owned table is under row-level security, and the API connects as a role that is neither the owner nor BYPASSRLS.
+See `server/README.md` for the flow and for production.
 
 ## Observability stack
 

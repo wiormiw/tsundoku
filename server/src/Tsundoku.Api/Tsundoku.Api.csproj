@@ -4,7 +4,7 @@
     The features live in the modules (src/Modules). The building blocks they share are in Tsundoku.Common.
   -->
   <PropertyGroup>
-    <!-- The chiseled image has no ICU. The API formats nothing by culture, so invariant mode is safe. -->
+    <!-- Invariant mode is safe: nothing is formatted by culture, and IANA time zone lookups need tzdata (the -extra image), not ICU. -->
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>

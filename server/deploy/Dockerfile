@@ -1,7 +1,7 @@
 # The API as a container. Build context is the template root:
-#   docker build -f deploy/Dockerfile -t tsundoku-api .                    # the API (default target)
-#   docker build -f deploy/Dockerfile --target migrate -t tsundoku-migrate .  # the EF migration bundle
-# Migrations run as their own deploy step before the new API starts (tip 28.01), not at API startup.
+#   docker build -f deploy/Dockerfile -t tsundoku-api .
+# Migrations run as their own deploy step before the new API starts (tip 28.01), not at API startup:
+# the same image with `migrate` as its argument (dotnet Tsundoku.Api.dll migrate).
 
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
@@ -16,21 +16,9 @@ RUN dotnet restore src/Tsundoku.Api/Tsundoku.Api.csproj
 COPY src/ src/
 RUN dotnet publish src/Tsundoku.Api/Tsundoku.Api.csproj -c Release -o /app --no-restore
 
-FROM build AS bundle
-# One bundle for each module that has migrations (today only Todos).
-RUN dotnet tool restore \
-    && dotnet ef migrations bundle --project src/Modules/Tsundoku.Modules.Todos --startup-project src/Modules/Tsundoku.Modules.Todos \
-       --configuration Release --output /efbundle
-
-# The migration bundle: run it with --connection "<connection string>".
-# It needs the ASP.NET Core framework, because Common uses it (health checks, hosted services).
-FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute-chiseled AS migrate
-COPY --from=bundle /efbundle /efbundle
-ENTRYPOINT ["/efbundle"]
-
 # Chiseled: no shell, no package manager, and a non-root user by default (tip 27.01).
-# The -extra image carries the IANA time zone data that the Accounts module validates against at startup
-# (plain chiseled has none, so the API would refuse to start). The API still sets InvariantGlobalization (no ICU use).
+# The -extra image carries the IANA time zone data that TimeZoneId and the engine need (plain chiseled has none).
+# InvariantGlobalization stays true: IANA lookups need tzdata, not ICU.
 # It has no curl either, so the orchestrator probes /health/live and /health/ready over HTTP.
 FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute-chiseled-extra AS api
 WORKDIR /app

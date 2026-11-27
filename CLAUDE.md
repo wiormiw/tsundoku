@@ -16,6 +16,7 @@ export PATH="$HOME/dotnet:$PATH"                     the SDK (11.0.100) lives th
 dotnet build server/Tsundoku.slnx                     warnings are errors
 cd server && dotnet test --solution Tsundoku.slnx      from server/ (its global.json picks the test runner); needs Docker
 dotnet run --project server/src/Tsundoku.AppHost      Aspire: Postgres 18, Valkey 8, the API, the dashboard
+dotnet run --project server/src/Tsundoku.Api -- migrate   the deploy step: migrations as the owner, then the tsundoku_api login
 ```
 
 `server/README.md` is the template's guide: layout, architecture rules, how to add a use case.

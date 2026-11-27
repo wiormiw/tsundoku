@@ -14,6 +14,9 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
+### Confirm the email → 200 (paste the link from the log: its userId and code)
+GET {{baseUrl}}/api/auth/confirm-email?userId=PASTE&code=PASTE
+
 ### Sign in → 200 { tokenType, accessToken, expiresIn, refreshToken }; unconfirmed → 403; wrong → 401
 # @name signIn
 POST {{baseUrl}}/api/auth/sign-in
@@ -30,6 +33,19 @@ Content-Type: application/json
 
 {
   "refreshToken": "{{signIn.response.body.$.refreshToken}}"
+}
+
+### Who am I → 200 { id, email, emailConfirmed, hasPassword, timezone }
+GET {{baseUrl}}/api/me
+Authorization: Bearer {{token}}
+
+### Change the time zone (an IANA id) → 200
+PATCH {{baseUrl}}/api/me/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "timezone": "America/Santiago"
 }
 
 ### Liveness and readiness → 200 (no token needed)
