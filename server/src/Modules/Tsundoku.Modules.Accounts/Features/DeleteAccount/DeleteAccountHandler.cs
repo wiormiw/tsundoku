@@ -10,10 +10,11 @@ namespace Tsundoku.Modules.Accounts.Features.DeleteAccount;
 /// <summary>
 /// Deletes the user; the foreign keys cascade its sessions, logins, tokens, claims and settings. Rows of other modules are not
 /// touched here: they wait for the AccountDeleted integration event (P3).
-/// The password is checked again because a bearer token alone must not delete the account (it may be stolen).
+/// The password (or, without one, a Google ID token) is checked again because a bearer token alone must not delete the account (it may be stolen).
 /// </summary>
 internal sealed partial class DeleteAccountHandler(
-    SignInManager<AccountUser> signIn, AccountsDbContext db, ICurrentUser current, CredentialTiming timing, ILogger<DeleteAccountHandler> logger)
+    SignInManager<AccountUser> signIn, AccountsDbContext db, ICurrentUser current, CredentialTiming timing,
+    GoogleIdTokenVerifier google, ILogger<DeleteAccountHandler> logger)
     : ICommandHandler<DeleteAccountCommand, DeleteAccountOutcome>
 {
     private static readonly DeleteAccountOutcome.Refused Invalid = new(AccountErrors.InvalidCredentials);
@@ -23,17 +24,29 @@ internal sealed partial class DeleteAccountHandler(
         var users = signIn.UserManager;
         if (await users.FindByIdAsync(current.Id.Value) is not { } user) return AccountErrors.SessionEnded;
 
-        // Task 7 seam: a user without a password proves itself with a fresh Google ID token (command.GoogleIdToken).
-        // Until then that case cannot be proven, so it is refused the same way as a missing proof.
-        if (user.PasswordHash is null || string.IsNullOrEmpty(command.Password)) return AccountErrors.ReauthenticationRequired;
-
-        await SignInLock.AcquireAsync(db, user, cancellationToken);
-        var checkedIn = await signIn.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: true);
-        if (!checkedIn.Succeeded)
+        if (user.PasswordHash is null)
         {
-            if (checkedIn.IsLockedOut) timing.VerifyDummy(command.Password);
-            Log.Refused(logger, user.Id);
-            return Invalid;
+            // No password to ask for: a fresh, single-use Google ID token of this account's own Google login is the proof.
+            if (string.IsNullOrEmpty(command.GoogleIdToken)) return AccountErrors.ReauthenticationRequired;
+            var identity = await google.VerifyAsync(command.GoogleIdToken, cancellationToken);
+            var logins = await users.GetLoginsAsync(user);
+            if (identity is null || !logins.Any(login => login.LoginProvider == GoogleIdTokenVerifier.LoginProvider && login.ProviderKey == identity.Subject))
+            {
+                Log.Refused(logger, user.Id);
+                return Invalid;
+            }
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(command.Password)) return AccountErrors.ReauthenticationRequired;
+            await SignInLock.AcquireAsync(db, user, cancellationToken);
+            var checkedIn = await signIn.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: true);
+            if (!checkedIn.Succeeded)
+            {
+                if (checkedIn.IsLockedOut) timing.VerifyDummy(command.Password);
+                Log.Refused(logger, user.Id);
+                return Invalid;
+            }
         }
 
         var deleted = await users.DeleteAsync(user);
@@ -44,7 +57,7 @@ internal sealed partial class DeleteAccountHandler(
 
     private static partial class Log
     {
-        [LoggerMessage(EventId = 2041, Level = LogLevel.Warning, Message = "Account deletion refused for user {UserId}: wrong password or locked out")]
+        [LoggerMessage(EventId = 2041, Level = LogLevel.Warning, Message = "Account deletion refused for user {UserId}: wrong password, locked out or no matching Google token")]
         public static partial void Refused(ILogger logger, Guid userId);
 
         [LoggerMessage(EventId = 2042, Level = LogLevel.Information, Message = "AccountDeleted {UserId}")]

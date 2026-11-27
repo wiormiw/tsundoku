@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Tsundoku.Modules.Accounts.Features;
 using Tsundoku.Modules.Accounts.Persistence;
 using System.Security.Cryptography;
@@ -86,6 +88,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Database:MigrateOnStartup", _migrated ? "false" : "true");
         builder.UseSetting("Accounts:PublicBaseUrl", "http://localhost");
         builder.UseSetting("Accounts:SignUpEnabled", "true");
+        builder.UseSetting("Accounts:Google:ClientIds:0", GoogleTokens.ClientId);
         builder.UseSetting("ApiLimits:RequestsPerMinute", "100000");
         // The outbox reads often, so the tests see the events quickly.
         builder.UseSetting("Outbox:PollInterval", "00:00:00.050");
@@ -97,6 +100,10 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<IEmailSender<AccountUser>>();
             services.AddSingleton<IAccountMailer>(Mail);
             services.AddSingleton<IEmailSender<AccountUser>>(Mail);
+            // Google's keys are a local one: no test calls Google.
+            services.RemoveAll<IConfigurationManager<OpenIdConnectConfiguration>>();
+            services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(
+                new StaticConfigurationManager<OpenIdConnectConfiguration>(GoogleTokens.Configuration));
         });
     }
 

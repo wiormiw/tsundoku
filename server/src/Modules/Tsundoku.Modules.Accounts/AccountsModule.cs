@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Identity;
 using Tsundoku.Common.Messaging;
@@ -14,6 +16,7 @@ using Tsundoku.Modules.Accounts.Features.OnConfirmationRequested;
 using Tsundoku.Modules.Accounts.Features.ConfirmEmail;
 using Tsundoku.Modules.Accounts.Features.DeleteAccount;
 using Tsundoku.Modules.Accounts.Features.GetMe;
+using Tsundoku.Modules.Accounts.Features.GoogleSignIn;
 using Tsundoku.Modules.Accounts.Features.SignOutEverywhere;
 using Tsundoku.Modules.Accounts.Features.UpdateSettings;
 using Tsundoku.Modules.Accounts.Features.RefreshSession;
@@ -82,6 +85,18 @@ public static class AccountsModule
         services.AddDomainEventHandler<AlreadyRegisteredNoticeRequested, AlreadyRegisteredNoticeRequestedHandler>();
         services.AddScoped<CredentialTiming>();
 
+        services.AddOptions<GoogleOptions>().BindConfiguration(GoogleOptions.Section).ValidateDataAnnotations()
+            .Validate(google => google.MetadataAddress is { IsAbsoluteUri: true, Scheme: "https" },
+                $"{GoogleOptions.Section}:{nameof(GoogleOptions.MetadataAddress)} must be an absolute https URL.")
+            .ValidateOnStart();
+        // The client gets the host's standard resilience (timeout, retries, circuit breaker); the manager caches the keys and refreshes them.
+        services.AddHttpClient(GoogleIdTokenVerifier.HttpClientName);
+        services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(provider => new ConfigurationManager<OpenIdConnectConfiguration>(
+            provider.GetRequiredService<IOptions<GoogleOptions>>().Value.MetadataAddress.AbsoluteUri,
+            new OpenIdConnectConfigurationRetriever(),
+            new HttpDocumentRetriever(provider.GetRequiredService<IHttpClientFactory>().CreateClient(GoogleIdTokenVerifier.HttpClientName)) { RequireHttps = true }));
+        services.AddSingleton<GoogleIdTokenVerifier>();
+
         services.AddValidator<SignUpCommand, SignUpCommandValidator>();
         services.AddValidator<ResendConfirmationCommand, ResendConfirmationCommandValidator>();
         services.AddValidator<SignInCommand, SignInCommandValidator>();
@@ -91,6 +106,7 @@ public static class AccountsModule
         services.AddAnonymousCommand<ResendConfirmationCommand, Success, ResendConfirmationHandler, AccountsDbContext>();
         services.AddAnonymousCommand<SignInCommand, SignInOutcome, SignInHandler, AccountsDbContext>();
         services.AddAnonymousCommand<RefreshSessionCommand, RefreshOutcome, RefreshSessionHandler, AccountsDbContext>();
+        services.AddAnonymousCommand<GoogleSignInCommand, SignedIn, GoogleSignInHandler, AccountsDbContext>();
 
         services.AddValidator<UpdateSettingsCommand, UpdateSettingsCommandValidator>();
         services.AddQuery<GetMeQuery, MeResponse, GetMeHandler, AccountsDbContext>();
@@ -109,6 +125,7 @@ public static class AccountsModule
         ResendConfirmationEndpoint.Map(auth);
         SignInEndpoint.Map(auth);
         RefreshSessionEndpoint.Map(auth);
+        GoogleSignInEndpoint.Map(auth);
 
         var me = api.MapGroup("/me").WithTags("Me");
         GetMeEndpoint.Map(me);

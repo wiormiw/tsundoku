@@ -46,4 +46,16 @@ internal static class AccountErrors
     // Deleting needs proof that is fresher than a bearer token: a stolen token must not delete the account.
     public static ValidationError ReauthenticationRequired =>
         ValidationError.For("password", "Send your password to delete the account.", ReauthenticationRequiredCode);
+
+    public const string GoogleNotConfiguredCode = "accounts.google_not_configured";
+    public const string EmailUnconfirmedCode = "accounts.email_unconfirmed";
+
+    public static NotFoundError GoogleNotConfigured => new(GoogleNotConfiguredCode, "Google sign-in is not available.");
+
+    // The same code as a wrong password: a forged, expired or replayed token tells the caller nothing more.
+    public static UnauthorizedError GoogleTokenInvalid => new(InvalidCredentialsCode, "The Google sign-in is not valid. Try again.");
+
+    // Linking would hand an account that someone registered but never confirmed to whoever holds the Google address (pre-account takeover).
+    public static ConflictError EmailUnconfirmed =>
+        new(EmailUnconfirmedCode, "An account with this email is waiting for confirmation. Confirm it, then sign in with Google.");
 }
