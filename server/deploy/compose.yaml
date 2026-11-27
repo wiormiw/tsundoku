@@ -35,8 +35,8 @@ services:
       target: api
     environment:
       ConnectionStrings__appdb: "Host=postgres;Database=appdb;Username=app;Password=${POSTGRES_PASSWORD}"
-      Authentication__Schemes__Bearer__Authority: ${AUTH_AUTHORITY:?set AUTH_AUTHORITY in deploy/.env}
-      Authentication__Schemes__Bearer__ValidAudiences__0: ${AUTH_AUDIENCE:-tsundoku-api}
+      Accounts__PublicBaseUrl: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in deploy/.env}
+      Accounts__SignUpEnabled: ${SIGNUP_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: tsundoku-api
     ports:

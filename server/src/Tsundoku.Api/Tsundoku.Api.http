@@ -1,8 +1,8 @@
 # Start the API (`dotnet run --project src/Tsundoku.AppHost`, or `dotnet run --project src/Tsundoku.Api`).
-# Get a development token one time, and paste it below:
-#   dotnet user-jwts create --project src/Tsundoku.Api --name alice --audience tsundoku-api
+# The access token comes from sign-in (the sign-up and sign-in endpoints arrive with Task 5): paste the
+# access token it returns below. Until then every call here answers 401.
 @baseUrl = http://localhost:5080
-@token = paste-the-token-here
+@token = paste-the-access-token-here
 
 ### Liveness and readiness → 200 (no token needed)
 GET {{baseUrl}}/health/ready
