@@ -45,7 +45,8 @@ internal sealed partial class GoogleIdTokenVerifier(
         if (token.ValidTo == DateTime.MinValue || token.IssuedAt == DateTime.MinValue) return Refused("no_lifetime");
         var expires = new DateTimeOffset(token.ValidTo, TimeSpan.Zero) + google.ClockSkew;
         if (expires <= now) return Refused("expired");
-        if (new DateTimeOffset(token.IssuedAt, TimeSpan.Zero) - google.ClockSkew > now) return Refused("issued_in_future");
+        var issuedAt = new DateTimeOffset(token.IssuedAt, TimeSpan.Zero);
+        if (issuedAt - google.ClockSkew > now) return Refused("issued_in_future");
 
         if (!token.TryGetPayloadValue<string>(JwtRegisteredClaimNames.Sub, out var subject) || string.IsNullOrEmpty(subject)
             || !token.TryGetPayloadValue<string>(JwtRegisteredClaimNames.Email, out var email) || string.IsNullOrEmpty(email)
@@ -55,7 +56,7 @@ internal sealed partial class GoogleIdTokenVerifier(
         // Single use: an ID token lives about an hour, so a copy (a log, a proxy) must not sign in again. Valkey down throws: fail closed.
         if (!await valkey.GetDatabase().StringSetAsync(ReplayKey(idToken), 1, expires - now, When.NotExists))
             return Refused("replayed");
-        return new GoogleIdentity(subject, email, emailVerified);
+        return new GoogleIdentity(subject, email, emailVerified, issuedAt);
     }
 
     /// <summary>The Valkey key that marks a token used: its hash, so the store never holds a usable token.</summary>

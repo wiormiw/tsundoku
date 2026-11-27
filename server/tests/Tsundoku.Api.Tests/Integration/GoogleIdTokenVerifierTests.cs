@@ -1,4 +1,6 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -38,15 +40,19 @@ public sealed class GoogleIdTokenVerifierTests(ApiFactory factory)
         NullLogger<GoogleIdTokenVerifier>.Instance);
 
     private static string Mint(DateTimeOffset now, string audience = GoogleTokens.ClientId, string issuer = GoogleTokens.Issuer,
-        bool? emailVerified = true, TimeSpan? issuedOffset = null, TimeSpan? expiresOffset = null, SecurityKey? key = null) =>
-        GoogleTokens.Mint("sub-1", "g@example.test", now, audience, issuer, emailVerified, issuedOffset, expiresOffset, key);
+        bool? emailVerified = true, TimeSpan? issuedOffset = null, TimeSpan? expiresOffset = null, SecurityKey? key = null,
+        string algorithm = SecurityAlgorithms.RsaSha256) =>
+        GoogleTokens.Mint("sub-1", "g@example.test", now, audience, issuer, emailVerified, issuedOffset, expiresOffset, key, algorithm);
 
     [Fact]
     public async Task A_valid_token_gives_the_identity()
     {
         var identity = await Verifier.VerifyAsync(Mint(Now), Ct);
 
-        identity.ShouldBe(new GoogleIdentity("sub-1", "g@example.test", true));
+        identity.ShouldNotBeNull();
+        (identity.Subject, identity.Email, identity.EmailVerified).ShouldBe(("sub-1", "g@example.test", true));
+        // The token carries whole seconds.
+        (Now - identity.IssuedAt).ShouldBeInRange(TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
     [Fact]
@@ -58,6 +64,30 @@ public sealed class GoogleIdTokenVerifierTests(ApiFactory factory)
         (await verifier.VerifyAsync(Mint(Now, key: new RsaSecurityKey(RSA.Create(2048)) { KeyId = "test-key" }), Ct)).ShouldBeNull();
         (await verifier.VerifyAsync(Mint(Now, key: new RsaSecurityKey(RSA.Create(2048)) { KeyId = "unknown" }), Ct)).ShouldBeNull();
         (await verifier.VerifyAsync(Mint(Now, emailVerified: null), Ct)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_unverified_email_is_reported_as_unverified()
+    {
+        var identity = await Verifier.VerifyAsync(Mint(Now, emailVerified: false), Ct);
+
+        // The verifier passes it on; sign-in refuses it (GoogleSignInTests).
+        identity.ShouldNotBeNull();
+        identity.EmailVerified.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Hs256_with_the_public_key_as_secret_and_alg_none_are_refused()
+    {
+        // The classic key confusion: the public key is no secret, so an HMAC made with it proves nothing.
+        var confused = new SymmetricSecurityKey(GoogleTokens.Key.Rsa.ExportSubjectPublicKeyInfo()) { KeyId = "test-key" };
+        var hs256 = Mint(Now, key: confused, algorithm: SecurityAlgorithms.HmacSha256);
+
+        var payload = Mint(Now).Split('.')[1];
+        var none = Base64Url.EncodeToString(Encoding.UTF8.GetBytes("""{"alg":"none","typ":"JWT","kid":"test-key"}""")) + "." + payload + ".";
+
+        (await Verifier.VerifyAsync(hs256, Ct)).ShouldBeNull();
+        (await Verifier.VerifyAsync(none, Ct)).ShouldBeNull();
     }
 
     [Fact]

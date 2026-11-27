@@ -183,7 +183,8 @@ public sealed class SignUpTests(ApiFactory factory)
                 services.AddLogging(builder => builder.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
                 services.RemoveAll<IAccountMailer>();
                 services.RemoveAll<IEmailSender<AccountUser>>();
-                services.AddSingleton<IAccountMailer, LogEmailSender>();
+                // Also into the shared capture: this host's outbox may claim another test's mail, which must still arrive there.
+                services.AddSingleton<IAccountMailer>(provider => new LoggedAndCaptured(provider.GetRequiredService<LogEmailSender>(), factory.Mail));
                 services.AddSingleton<IEmailSender<AccountUser>>(provider => provider.GetRequiredService<IAccountMailer>());
             }));
         using var client = logging.CreateClient();
@@ -273,6 +274,25 @@ public sealed class SignUpTests(ApiFactory factory)
         var failure = Should.Throw<OptionsValidationException>(() => logOnly.CreateClient());
 
         failure.Message.ShouldContain("needs a real mailer (B9); use Google sign-in until then");
+    }
+
+    private sealed class LoggedAndCaptured(LogEmailSender log, CapturingEmailSender capture) : IAccountMailer
+    {
+        public async Task SendConfirmationLinkAsync(AccountUser user, string email, string confirmationLink)
+        {
+            await log.SendConfirmationLinkAsync(user, email, confirmationLink);
+            await capture.SendConfirmationLinkAsync(user, email, confirmationLink);
+        }
+
+        public async Task SendAlreadyRegisteredAsync(AccountUser user)
+        {
+            await log.SendAlreadyRegisteredAsync(user);
+            await capture.SendAlreadyRegisteredAsync(user);
+        }
+
+        public Task SendPasswordResetLinkAsync(AccountUser user, string email, string resetLink) => throw new NotSupportedException();
+
+        public Task SendPasswordResetCodeAsync(AccountUser user, string email, string resetCode) => throw new NotSupportedException();
     }
 
     private sealed class HashCounter

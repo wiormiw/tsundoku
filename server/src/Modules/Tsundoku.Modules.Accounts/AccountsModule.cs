@@ -90,11 +90,19 @@ public static class AccountsModule
                 $"{GoogleOptions.Section}:{nameof(GoogleOptions.MetadataAddress)} must be an absolute https URL.")
             .ValidateOnStart();
         // The client gets the host's standard resilience (timeout, retries, circuit breaker); the manager caches the keys and refreshes them.
-        services.AddHttpClient(GoogleIdTokenVerifier.HttpClientName);
-        services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(provider => new ConfigurationManager<OpenIdConnectConfiguration>(
-            provider.GetRequiredService<IOptions<GoogleOptions>>().Value.MetadataAddress.AbsoluteUri,
-            new OpenIdConnectConfigurationRetriever(),
-            new HttpDocumentRetriever(provider.GetRequiredService<IHttpClientFactory>().CreateClient(GoogleIdTokenVerifier.HttpClientName)) { RequireHttps = true }));
+        services.AddHttpClient(GoogleIdTokenVerifier.HttpClientName)
+            .ConfigureHttpClient((provider, client) => client.Timeout = provider.GetRequiredService<IOptions<GoogleOptions>>().Value.HttpTimeout);
+        services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(provider =>
+        {
+            var google = provider.GetRequiredService<IOptions<GoogleOptions>>().Value;
+            var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(GoogleIdTokenVerifier.HttpClientName);
+            return new ConfigurationManager<OpenIdConnectConfiguration>(
+                google.MetadataAddress.AbsoluteUri, new OpenIdConnectConfigurationRetriever(), new HttpDocumentRetriever(client) { RequireHttps = true })
+            {
+                AutomaticRefreshInterval = google.KeysAutomaticRefreshInterval,
+                RefreshInterval = google.KeysRefreshInterval,
+            };
+        });
         services.AddSingleton<GoogleIdTokenVerifier>();
 
         services.AddValidator<SignUpCommand, SignUpCommandValidator>();

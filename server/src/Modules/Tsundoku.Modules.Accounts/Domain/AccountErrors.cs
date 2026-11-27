@@ -58,4 +58,13 @@ internal static class AccountErrors
     // Linking would hand an account that someone registered but never confirmed to whoever holds the Google address (pre-account takeover).
     public static ConflictError EmailUnconfirmed =>
         new(EmailUnconfirmedCode, "An account with this email is waiting for confirmation. Confirm it, then sign in with Google.");
+
+    // A Google-only account has no password: the proof is a Google sign-in made just before. Same code, so clients handle one case.
+    public static ValidationError GoogleReauthenticationRequired =>
+        ValidationError.For("googleIdToken", "Sign in with Google again, then delete the account.", ReauthenticationRequiredCode);
+
+    public const string SignUpConflictCode = "accounts.sign_up_conflict";
+
+    // Another sign-up for the same address committed while this one ran; trying again finds that account.
+    public static ConflictError SignUpConflict => new(SignUpConflictCode, "Another sign-up for this email is in progress. Try again.");
 }

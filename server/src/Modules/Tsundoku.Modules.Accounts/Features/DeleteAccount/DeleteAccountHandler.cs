@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Identity;
 using Tsundoku.Common.Messaging;
@@ -14,7 +15,7 @@ namespace Tsundoku.Modules.Accounts.Features.DeleteAccount;
 /// </summary>
 internal sealed partial class DeleteAccountHandler(
     SignInManager<AccountUser> signIn, AccountsDbContext db, ICurrentUser current, CredentialTiming timing,
-    GoogleIdTokenVerifier google, ILogger<DeleteAccountHandler> logger)
+    GoogleIdTokenVerifier google, TimeProvider clock, IOptions<GoogleOptions> googleOptions, ILogger<DeleteAccountHandler> logger)
     : ICommandHandler<DeleteAccountCommand, DeleteAccountOutcome>
 {
     private static readonly DeleteAccountOutcome.Refused Invalid = new(AccountErrors.InvalidCredentials);
@@ -27,7 +28,7 @@ internal sealed partial class DeleteAccountHandler(
         if (user.PasswordHash is null)
         {
             // No password to ask for: a fresh, single-use Google ID token of this account's own Google login is the proof.
-            if (string.IsNullOrEmpty(command.GoogleIdToken)) return AccountErrors.ReauthenticationRequired;
+            if (string.IsNullOrEmpty(command.GoogleIdToken)) return AccountErrors.GoogleReauthenticationRequired;
             var identity = await google.VerifyAsync(command.GoogleIdToken, cancellationToken);
             var logins = await users.GetLoginsAsync(user);
             if (identity is null || !logins.Any(login => login.LoginProvider == GoogleIdTokenVerifier.LoginProvider && login.ProviderKey == identity.Subject))
@@ -35,6 +36,8 @@ internal sealed partial class DeleteAccountHandler(
                 Log.Refused(logger, user.Id);
                 return Invalid;
             }
+            // An ID token lives an hour; deletion wants a sign-in made just now, as a password typed now would be.
+            if (clock.GetUtcNow() - identity.IssuedAt > googleOptions.Value.ReauthenticationMaxAge) return AccountErrors.GoogleReauthenticationRequired;
         }
         else
         {

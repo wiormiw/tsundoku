@@ -29,7 +29,7 @@ internal static class GoogleTokens
     /// <summary>A valid token unless an argument says otherwise. A random nonce makes every token unique, as Google's are.</summary>
     public static string Mint(
         string subject, string email, DateTimeOffset now, string audience = ClientId, string issuer = Issuer, bool? emailVerified = true,
-        TimeSpan? issuedOffset = null, TimeSpan? expiresOffset = null, SecurityKey? key = null)
+        TimeSpan? issuedOffset = null, TimeSpan? expiresOffset = null, SecurityKey? key = null, string algorithm = SecurityAlgorithms.RsaSha256)
     {
         Dictionary<string, object> claims = new() { ["sub"] = subject, ["email"] = email, ["nonce"] = Guid.NewGuid().ToString("N") };
         if (emailVerified is { } verified) claims["email_verified"] = verified;
@@ -40,7 +40,7 @@ internal static class GoogleTokens
             Claims = claims,
             IssuedAt = (now + (issuedOffset ?? TimeSpan.Zero)).UtcDateTime,
             Expires = (now + (expiresOffset ?? TimeSpan.FromHours(1))).UtcDateTime,
-            SigningCredentials = new SigningCredentials(key ?? Key, SecurityAlgorithms.RsaSha256),
+            SigningCredentials = new SigningCredentials(key ?? Key, algorithm),
         });
     }
 }

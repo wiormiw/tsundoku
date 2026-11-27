@@ -176,4 +176,116 @@ public sealed class GoogleSignInTests(ApiFactory factory)
         (await UsersWithEmail(email)).ShouldBe(0);
         (await GoogleLogins(id)).ShouldBe(0);
     }
+
+    [Fact]
+    public async Task A_second_google_account_with_the_same_email_is_not_linked()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var email = NewEmail();
+        var id = (await MeOf(client, await GoogleSignedIn(client, GoogleTokens.NewSubject(), email))).Id;
+
+        // The address was recycled: a different Google account now owns it.
+        using var response = await Google(client, Mint(GoogleTokens.NewSubject(), email));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.invalid_credentials");
+        (await GoogleLogins(id)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task An_unverified_google_email_neither_signs_up_nor_links()
+    {
+        var (confirmed, _) = await SignUpConfirmedAsync(factory, Ct);
+        using var client = factory.CreateApiClient(user: null);
+        var fresh = NewEmail();
+
+        foreach (var email in new[] { fresh, confirmed })
+        {
+            using var response = await Google(client, GoogleTokens.Mint(GoogleTokens.NewSubject(), email, DateTimeOffset.UtcNow, emailVerified: false));
+            response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        }
+
+        (await UsersWithEmail(fresh)).ShouldBe(0);
+        await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
+        await connection.OpenAsync(Ct);
+        await using var command = new NpgsqlCommand(
+            "select count(*) from accounts.user_logins l join accounts.users u on u.id = l.user_id where u.email = @email", connection);
+        command.Parameters.AddWithValue("email", confirmed);
+        ((long)(await command.ExecuteScalarAsync(Ct))!).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Parallel_first_sign_ins_of_one_google_account_create_one_user()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var (subject, email) = (GoogleTokens.NewSubject(), NewEmail());
+
+        // Without the per-sub lock, all but one would hit the unique user name and answer 409.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => Google(client, Mint(subject, email))));
+
+        responses.Select(response => response.StatusCode).ShouldAllBe(status => status == HttpStatusCode.OK);
+        (await UsersWithEmail(email)).ShouldBe(1);
+        var id = (await MeOf(client, (await responses[0].Content.ReadFromJsonAsync<AccessTokenResponse>(Ct))!)).Id;
+        (await GoogleLogins(id)).ShouldBe(1);
+        foreach (var response in responses) response.Dispose();
+    }
+
+    [Fact]
+    public async Task A_password_sign_up_committing_first_makes_google_sign_in_409_not_500()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var email = NewEmail();
+        // A sign-up of the same address, inserted but not committed: Google's lookups miss it and its insert waits on the index.
+        await using var signUp = new NpgsqlConnection(factory.OwnerConnectionString);
+        await signUp.OpenAsync(Ct);
+        await using var transaction = await signUp.BeginTransactionAsync(Ct);
+        await using (var insert = new NpgsqlCommand("""
+            insert into accounts.users (id, user_name, normalized_user_name, email, normalized_email, email_confirmed, security_stamp,
+                phone_number_confirmed, two_factor_enabled, lockout_enabled, access_failed_count)
+            values (@id, @email, upper(@email), @email, upper(@email), false, 'stamp', false, false, true, 0)
+            """, signUp, transaction))
+        {
+            insert.Parameters.AddWithValue("id", Guid.CreateVersion7());
+            insert.Parameters.AddWithValue("email", email);
+            await insert.ExecuteNonQueryAsync(Ct);
+        }
+
+        var google = Google(client, Mint(GoogleTokens.NewSubject(), email));
+        await using (var watcher = new NpgsqlConnection(factory.OwnerConnectionString))
+        {
+            await watcher.OpenAsync(Ct);
+            await using var waiting = new NpgsqlCommand(
+                "select count(*) from pg_stat_activity where wait_event_type = 'Lock' and query ilike '%insert into accounts.users%'", watcher);
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            while ((long)(await waiting.ExecuteScalarAsync(Ct))! == 0)
+            {
+                if (DateTimeOffset.UtcNow > deadline) throw new TimeoutException("The Google sign-in never waited on the sign-up's insert.");
+                await Task.Delay(20, Ct);
+            }
+        }
+        await transaction.CommitAsync(Ct);
+
+        using var response = await google;
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.sign_up_conflict");
+        (await UsersWithEmail(email)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Deleting_with_an_old_id_token_needs_a_fresh_sign_in()
+    {
+        using var client = factory.CreateApiClient(user: null);
+        var (subject, email) = (GoogleTokens.NewSubject(), NewEmail());
+        var tokens = await GoogleSignedIn(client, subject, email);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        // Still unexpired (an hour's lifetime), but issued longer ago than ReauthenticationMaxAge (5 min).
+        var old = GoogleTokens.Mint(subject, email, DateTimeOffset.UtcNow, issuedOffset: TimeSpan.FromMinutes(-10), expiresOffset: TimeSpan.FromMinutes(50));
+        using var refused = await client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Delete, "/api/me") { Content = JsonContent.Create(new { googleIdToken = old }) }, Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await refused.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.reauthentication_required");
+        (await UsersWithEmail(email)).ShouldBe(1);
+    }
 }

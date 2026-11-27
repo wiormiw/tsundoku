@@ -17,4 +17,20 @@ internal sealed class GoogleOptions
     /// <summary>The tolerance on <c>exp</c> and <c>iat</c> for clocks that disagree with Google's.</summary>
     [Range(typeof(TimeSpan), "00:00:00", "00:05:00")]
     public TimeSpan ClockSkew { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Deleting a Google-only account needs an ID token issued at most this long ago: a fresh sign-in, not an old token.</summary>
+    [Range(typeof(TimeSpan), "00:00:30", "01:00:00")]
+    public TimeSpan ReauthenticationMaxAge { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>How often Google's keys are fetched again on a schedule (the library default; it refuses less than 5 min).</summary>
+    [Range(typeof(TimeSpan), "00:05:00", "7.00:00:00")]
+    public TimeSpan KeysAutomaticRefreshInterval { get; init; } = TimeSpan.FromHours(12);
+
+    /// <summary>The least time between fetches asked for by an unknown key id, so forged key ids cannot hammer Google (the library default).</summary>
+    [Range(typeof(TimeSpan), "00:00:01", "1.00:00:00")]
+    public TimeSpan KeysRefreshInterval { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>The whole fetch of the discovery document or the keys, retries included (the standard resilience handler's total timeout).</summary>
+    [Range(typeof(TimeSpan), "00:00:01", "00:02:00")]
+    public TimeSpan HttpTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
