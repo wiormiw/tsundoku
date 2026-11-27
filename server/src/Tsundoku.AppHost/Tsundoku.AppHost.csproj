@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+  <!-- Local development: persistent Postgres and Valkey containers, the API, and the Aspire dashboard. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Keeps the Postgres password for development (Parameters:postgres-password). See Program.cs. -->
+    <UserSecretsId>6889eb5a-72a0-4e4c-a782-829b9c549fc9</UserSecretsId>
+    <!-- Start it with `dotnet run`. This AppHost does not need the Aspire CLI. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Valkey" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tsundoku.Api\Tsundoku.Api.csproj" />
+  </ItemGroup>
+</Project>

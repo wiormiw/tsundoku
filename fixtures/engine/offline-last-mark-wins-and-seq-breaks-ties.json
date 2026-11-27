@@ -1,0 +1,163 @@
+{
+	"name": "offline-last-mark-wins-and-seq-breaks-ties",
+	"facts": [
+		{
+			"type": "goal.created",
+			"occurredAt": "2026-02-20T00:00:00Z",
+			"data": {
+				"title": "Goal",
+				"areas": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000a1",
+						"name": "Practice"
+					}
+				],
+				"rangeActiveDays": 10,
+				"startDate": "2026-03-02",
+				"timezone": "Asia/Jakarta",
+				"caps": {}
+			}
+		},
+		{
+			"type": "plan.approved",
+			"occurredAt": "2026-02-20T01:00:00Z",
+			"data": {
+				"planVersion": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000a1",
+							"name": "Practice",
+							"milestones": [
+								{
+									"id": "00000000-0000-4000-8000-0000000000c1",
+									"title": "Core",
+									"days": 100,
+									"activities": [
+										{
+											"id": "00000000-0000-4000-8000-0000000000b1",
+											"name": "Drill",
+											"unit": "minutes",
+											"floor": 10,
+											"stretch": 20,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-02T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 10
+			}
+		},
+		{
+			"type": "day.marked_offline",
+			"occurredAt": "2026-03-02T01:00:00Z",
+			"data": {
+				"date": "2026-03-03"
+			}
+		},
+		{
+			"type": "day.unmarked_offline",
+			"occurredAt": "2026-03-02T02:00:00Z",
+			"data": {
+				"date": "2026-03-03"
+			}
+		},
+		{
+			"type": "day.marked_offline",
+			"occurredAt": "2026-03-02T03:00:00Z",
+			"data": {
+				"date": "2026-03-03"
+			}
+		},
+		{
+			"type": "day.marked_offline",
+			"occurredAt": "2026-03-03T05:00:00Z",
+			"data": {
+				"date": "2026-03-04"
+			},
+			"seq": "102"
+		},
+		{
+			"type": "day.unmarked_offline",
+			"occurredAt": "2026-03-03T05:00:00Z",
+			"data": {
+				"date": "2026-03-04"
+			},
+			"seq": "101"
+		},
+		{
+			"type": "day.unmarked_offline",
+			"occurredAt": "2026-03-04T05:00:00Z",
+			"data": {
+				"date": "2026-03-05"
+			},
+			"seq": "104"
+		},
+		{
+			"type": "day.marked_offline",
+			"occurredAt": "2026-03-04T05:00:00Z",
+			"data": {
+				"date": "2026-03-05"
+			},
+			"seq": "103"
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-05T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 10
+			}
+		}
+	],
+	"checks": [
+		{
+			"today": "2026-03-06",
+			"expect": {
+				"endDate": "2026-03-13",
+				"activeDaysUsed": 2,
+				"days": [
+					{
+						"date": "2026-03-02",
+						"status": "met",
+						"k": 0
+					},
+					{
+						"date": "2026-03-03",
+						"status": "offline",
+						"k": null
+					},
+					{
+						"date": "2026-03-04",
+						"status": "offline",
+						"k": null
+					},
+					{
+						"date": "2026-03-05",
+						"status": "met",
+						"k": 1
+					}
+				],
+				"allowance": [
+					{
+						"month": "2026-03",
+						"used": 2,
+						"cap": 10
+					}
+				]
+			}
+		}
+	]
+}

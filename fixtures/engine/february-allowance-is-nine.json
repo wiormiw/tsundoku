@@ -1,0 +1,84 @@
+{
+	"name": "february-allowance-is-nine",
+	"facts": [
+		{
+			"type": "goal.created",
+			"occurredAt": "2026-02-20T00:00:00Z",
+			"data": {
+				"title": "Goal",
+				"areas": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000a1",
+						"name": "Practice"
+					}
+				],
+				"rangeActiveDays": 30,
+				"startDate": "2026-02-01",
+				"timezone": "Asia/Jakarta",
+				"caps": {}
+			}
+		},
+		{
+			"type": "plan.approved",
+			"occurredAt": "2026-02-20T01:00:00Z",
+			"data": {
+				"planVersion": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000a1",
+							"name": "Practice",
+							"milestones": [
+								{
+									"id": "00000000-0000-4000-8000-0000000000c1",
+									"title": "Core",
+									"days": 100,
+									"activities": [
+										{
+											"id": "00000000-0000-4000-8000-0000000000b1",
+											"name": "Drill",
+											"unit": "minutes",
+											"floor": 10,
+											"stretch": 20,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	],
+	"checks": [
+		{
+			"today": "2026-02-11",
+			"expect": {
+				"endDate": "2026-03-11",
+				"activeDaysUsed": 1,
+				"days": [
+					{
+						"date": "2026-02-09",
+						"status": "skipped",
+						"k": null
+					},
+					{
+						"date": "2026-02-10",
+						"status": "missed",
+						"k": 0
+					}
+				],
+				"allowance": [
+					{
+						"month": "2026-02",
+						"used": 9,
+						"cap": 9
+					}
+				]
+			}
+		}
+	]
+}

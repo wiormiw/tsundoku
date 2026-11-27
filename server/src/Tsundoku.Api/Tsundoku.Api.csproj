@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    The host: HTTP endpoints, auth, limits, and the change of results into problem details.
+    The features live in the modules (src/Modules). The building blocks they share are in Tsundoku.Common.
+  -->
+  <PropertyGroup>
+    <!-- The chiseled image has no ICU. The API formats nothing by culture, so invariant mode is safe. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tsundoku.Common\Tsundoku.Common.csproj" />
+    <ProjectReference Include="..\Modules\Tsundoku.Modules.Todos\Tsundoku.Modules.Todos.csproj" />
+    <ProjectReference Include="..\Tsundoku.ServiceDefaults\Tsundoku.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tsundoku.Api.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Architecture.Tests" />
+  </ItemGroup>
+</Project>

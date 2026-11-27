@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Tsundoku.AppHost/Tsundoku.AppHost.csproj" />
+    <Project Path="src/Tsundoku.Api/Tsundoku.Api.csproj" />
+    <Project Path="src/Tsundoku.Common/Tsundoku.Common.csproj" />
+    <Project Path="src/Tsundoku.Engine/Tsundoku.Engine.csproj" />
+    <Project Path="src/Tsundoku.ServiceDefaults/Tsundoku.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/Tsundoku.Modules.Todos/Tsundoku.Modules.Todos.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tsundoku.Api.Tests/Tsundoku.Api.Tests.csproj" />
+    <Project Path="tests/Tsundoku.Architecture.Tests/Tsundoku.Architecture.Tests.csproj" />
+    <Project Path="tests/Tsundoku.Modules.Todos.Tests/Tsundoku.Modules.Todos.Tests.csproj" />
+    <Project Path="tests/Tsundoku.Engine.Tests/Tsundoku.Engine.Tests.csproj" />
+  </Folder>
+</Solution>

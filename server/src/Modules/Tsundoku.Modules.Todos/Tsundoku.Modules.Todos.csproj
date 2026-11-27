@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The todo lists module (the template's sample). Its only public type is TodosModule: everything else is internal.
+    It owns the "todos" schema, its migrations and its outbox table. It references Common and no other module.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tsundoku.Common\Tsundoku.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tsundoku.Modules.Todos.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Api.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Architecture.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The fold: a pure function of a goal's facts, its rules and `today`.
+    Plain C#: no other project, no package, no I/O, no clock, no randomness. The architecture tests check it.
+  -->
+</Project>

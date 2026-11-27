@@ -1,0 +1,42 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,xml,csproj,props,slnx,yml,yaml,http}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:error
+csharp_using_directive_placement = outside_namespace:error
+dotnet_sort_system_directives_first = true
+
+# No unused using directives. The build fails on them.
+dotnet_diagnostic.IDE0005.severity = warning
+
+# Immutability: readonly fields, readonly structs and readonly struct members.
+dotnet_style_readonly_field = true:error
+dotnet_diagnostic.IDE0044.severity = error
+csharp_style_prefer_readonly_struct = true:error
+dotnet_diagnostic.IDE0250.severity = error
+csharp_style_prefer_readonly_struct_member = true:error
+dotnet_diagnostic.IDE0251.severity = error
+
+# Logging: source-generated [LoggerMessage] only, with constant templates (tips 11.x).
+dotnet_diagnostic.CA1848.severity = error
+dotnet_diagnostic.CA2254.severity = error
+dotnet_diagnostic.CA1727.severity = error
+dotnet_diagnostic.CA1873.severity = error
+
+# Generated EF migrations keep the style of EF.
+[**/Migrations/*.cs]
+generated_code = true
+
+# Test names read as sentences.
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none

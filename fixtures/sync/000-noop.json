@@ -1,0 +1,9 @@
+{
+	"name": "000-noop",
+	"v": 1,
+	"now": "2026-11-21T10:00:00Z",
+	"seed": { "goals": [], "plans": [], "facts": [] },
+	"given": { "local": { "facts": [], "goals": [], "plans": [], "states": [] }, "outbox": [] },
+	"steps": [],
+	"expect": { "local": { "facts": [], "goals": [], "plans": [], "states": [] }, "outbox": [] }
+}

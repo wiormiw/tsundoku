@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The architecture rules, checked in the compiled IL of each layer and in the source files (tip 25.06). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tsundoku.Api\Tsundoku.Api.csproj" />
+    <ProjectReference Include="..\..\src\Tsundoku.Engine\Tsundoku.Engine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+    <Using Include="NetArchTest.Rules" />
+  </ItemGroup>
+</Project>

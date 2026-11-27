@@ -1,0 +1,15 @@
+{
+	"name": "001-health-only",
+	"v": 1,
+	"now": "2026-11-21T10:00:00Z",
+	"seed": { "goals": [], "plans": [], "facts": [] },
+	"given": { "local": { "facts": [], "goals": [], "plans": [], "states": [] }, "outbox": [] },
+	"steps": [
+		{
+			"kind": "server",
+			"request": { "method": "GET", "path": "/healthz" },
+			"response": { "status": 200, "body": { "status": "ok" } }
+		}
+	],
+	"expect": { "local": { "facts": [], "goals": [], "plans": [], "states": [] }, "outbox": [] }
+}

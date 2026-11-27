@@ -1,0 +1,107 @@
+{
+	"name": "debt-skipped-day-owes-every-due-floor",
+	"facts": [
+		{
+			"type": "goal.created",
+			"occurredAt": "2026-02-20T00:00:00Z",
+			"data": {
+				"title": "Goal",
+				"areas": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000a1",
+						"name": "Practice"
+					}
+				],
+				"rangeActiveDays": 30,
+				"startDate": "2026-03-02",
+				"timezone": "Asia/Jakarta",
+				"caps": {}
+			}
+		},
+		{
+			"type": "plan.approved",
+			"occurredAt": "2026-02-20T01:00:00Z",
+			"data": {
+				"planVersion": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000a1",
+							"name": "Practice",
+							"milestones": [
+								{
+									"id": "00000000-0000-4000-8000-0000000000c1",
+									"title": "Core",
+									"days": 100,
+									"activities": [
+										{
+											"id": "00000000-0000-4000-8000-0000000000b1",
+											"name": "Act1",
+											"unit": "minutes",
+											"floor": 40,
+											"stretch": 80,
+											"cadence": {
+												"kind": "daily"
+											}
+										},
+										{
+											"id": "00000000-0000-4000-8000-0000000000b2",
+											"name": "Act2",
+											"unit": "pages",
+											"floor": 10,
+											"stretch": 20,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	],
+	"checks": [
+		{
+			"today": "2026-03-03",
+			"expect": {
+				"days": [
+					{
+						"date": "2026-03-02",
+						"status": "skipped",
+						"k": null
+					}
+				],
+				"activeDaysUsed": 0,
+				"debtExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"amount": 50,
+						"overdue": false
+					},
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b2",
+						"amount": 13,
+						"overdue": false
+					}
+				],
+				"requiredExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"floor": 40,
+						"debtDue": 20,
+						"total": 60
+					},
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b2",
+						"floor": 10,
+						"debtDue": 5,
+						"total": 15
+					}
+				]
+			}
+		}
+	]
+}

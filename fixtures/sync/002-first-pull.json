@@ -1,0 +1,47 @@
+{
+	"name": "002-first-pull",
+	"v": 1,
+	"now": "2026-11-21T10:00:00Z",
+	"seed": {
+		"goals": [],
+		"plans": [],
+		"facts": []
+	},
+	"given": {
+		"local": {
+			"facts": [],
+			"goals": [],
+			"plans": [],
+			"states": []
+		},
+		"outbox": []
+	},
+	"steps": [
+		{
+			"kind": "server",
+			"request": {
+				"method": "GET",
+				"path": "/sync/pull"
+			},
+			"response": {
+				"status": 200,
+				"body": {
+					"facts": [],
+					"nextSince": "0",
+					"hasMore": false,
+					"goals": [],
+					"states": []
+				}
+			}
+		}
+	],
+	"expect": {
+		"local": {
+			"facts": [],
+			"goals": [],
+			"plans": [],
+			"states": []
+		},
+		"outbox": []
+	}
+}

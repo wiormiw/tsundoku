@@ -1,0 +1,624 @@
+{
+	"name": "003-paged-pull",
+	"v": 1,
+	"now": "2026-11-21T10:00:00Z",
+	"seed": {
+		"goals": [
+			{
+				"id": "01930000-0000-7000-8000-00000000a001",
+				"title": "Learn guitar",
+				"status": "running",
+				"rangeActiveDays": 7,
+				"startDate": "2026-11-20",
+				"timezone": "Asia/Jakarta",
+				"offlineCapPerMonth": null,
+				"areas": [
+					{
+						"id": "01930000-0000-7000-8000-00000000a101",
+						"name": "Guitar"
+					}
+				],
+				"createdAt": "2026-11-20T01:00:00.000Z"
+			}
+		],
+		"plans": [
+			{
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"version": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "01930000-0000-7000-8000-00000000a101",
+							"name": "Guitar",
+							"milestones": [
+								{
+									"id": "01930000-0000-7000-8000-00000000a201",
+									"title": "Basics",
+									"days": 7,
+									"activities": [
+										{
+											"id": "01930000-0000-7000-8000-00000000a301",
+											"name": "Practise",
+											"unit": "minutes",
+											"floor": 10,
+											"stretch": 30,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				},
+				"approvedAt": "2026-11-20T01:00:00.000Z"
+			}
+		],
+		"facts": [
+			{
+				"id": "01930000-0000-7000-8000-00000000f001",
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"type": "goal.created",
+				"v": 1,
+				"occurredAt": "2026-11-20T01:00:00.000Z",
+				"data": {
+					"title": "Learn guitar",
+					"areas": [
+						{
+							"id": "01930000-0000-7000-8000-00000000a101",
+							"name": "Guitar"
+						}
+					],
+					"rangeActiveDays": 7,
+					"startDate": "2026-11-20",
+					"timezone": "Asia/Jakarta",
+					"caps": {}
+				}
+			},
+			{
+				"id": "01930000-0000-7000-8000-00000000f002",
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"type": "plan.approved",
+				"v": 1,
+				"occurredAt": "2026-11-20T01:00:00.000Z",
+				"data": {
+					"planVersion": 1,
+					"curriculum": {
+						"areas": [
+							{
+								"id": "01930000-0000-7000-8000-00000000a101",
+								"name": "Guitar",
+								"milestones": [
+									{
+										"id": "01930000-0000-7000-8000-00000000a201",
+										"title": "Basics",
+										"days": 7,
+										"activities": [
+											{
+												"id": "01930000-0000-7000-8000-00000000a301",
+												"name": "Practise",
+												"unit": "minutes",
+												"floor": 10,
+												"stretch": 30,
+												"cadence": {
+													"kind": "daily"
+												}
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				}
+			},
+			{
+				"id": "01930000-0000-7000-8000-00000000b001",
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"type": "activity.logged",
+				"v": 1,
+				"occurredAt": "2026-11-21T02:00:00.000Z",
+				"data": {
+					"activityId": "01930000-0000-7000-8000-00000000a301",
+					"amount": 15
+				}
+			},
+			{
+				"id": "01930000-0000-7000-8000-00000000b002",
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"type": "activity.logged",
+				"v": 1,
+				"occurredAt": "2026-11-21T03:00:00.000Z",
+				"data": {
+					"activityId": "01930000-0000-7000-8000-00000000a301",
+					"amount": 20
+				}
+			},
+			{
+				"id": "01930000-0000-7000-8000-00000000b003",
+				"goalId": "01930000-0000-7000-8000-00000000a001",
+				"type": "activity.logged",
+				"v": 1,
+				"occurredAt": "2026-11-21T04:00:00.000Z",
+				"data": {
+					"activityId": "01930000-0000-7000-8000-00000000a301",
+					"amount": 5
+				}
+			}
+		]
+	},
+	"given": {
+		"local": {
+			"facts": [],
+			"goals": [],
+			"plans": [],
+			"states": []
+		},
+		"outbox": []
+	},
+	"steps": [
+		{
+			"kind": "server",
+			"request": {
+				"method": "GET",
+				"path": "/sync/pull?since=0&limit=2"
+			},
+			"response": {
+				"status": 200,
+				"body": {
+					"facts": [
+						{
+							"id": "01930000-0000-7000-8000-00000000f001",
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"type": "goal.created",
+							"v": 1,
+							"occurredAt": "2026-11-20T01:00:00.000Z",
+							"data": {
+								"title": "Learn guitar",
+								"areas": [
+									{
+										"id": "01930000-0000-7000-8000-00000000a101",
+										"name": "Guitar"
+									}
+								],
+								"rangeActiveDays": 7,
+								"startDate": "2026-11-20",
+								"timezone": "Asia/Jakarta",
+								"caps": {}
+							},
+							"seq": "1",
+							"receivedAt": "<instant>"
+						},
+						{
+							"id": "01930000-0000-7000-8000-00000000f002",
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"type": "plan.approved",
+							"v": 1,
+							"occurredAt": "2026-11-20T01:00:00.000Z",
+							"data": {
+								"planVersion": 1,
+								"curriculum": {
+									"areas": [
+										{
+											"id": "01930000-0000-7000-8000-00000000a101",
+											"name": "Guitar",
+											"milestones": [
+												{
+													"id": "01930000-0000-7000-8000-00000000a201",
+													"title": "Basics",
+													"days": 7,
+													"activities": [
+														{
+															"id": "01930000-0000-7000-8000-00000000a301",
+															"name": "Practise",
+															"unit": "minutes",
+															"floor": 10,
+															"stretch": 30,
+															"cadence": {
+																"kind": "daily"
+															}
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							},
+							"seq": "2",
+							"receivedAt": "<instant>"
+						}
+					],
+					"nextSince": "2",
+					"hasMore": true
+				}
+			}
+		},
+		{
+			"kind": "server",
+			"request": {
+				"method": "GET",
+				"path": "/sync/pull?since=2&limit=2"
+			},
+			"response": {
+				"status": 200,
+				"body": {
+					"facts": [
+						{
+							"id": "01930000-0000-7000-8000-00000000b001",
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"type": "activity.logged",
+							"v": 1,
+							"occurredAt": "2026-11-21T02:00:00.000Z",
+							"data": {
+								"activityId": "01930000-0000-7000-8000-00000000a301",
+								"amount": 15
+							},
+							"seq": "3",
+							"receivedAt": "<instant>"
+						},
+						{
+							"id": "01930000-0000-7000-8000-00000000b002",
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"type": "activity.logged",
+							"v": 1,
+							"occurredAt": "2026-11-21T03:00:00.000Z",
+							"data": {
+								"activityId": "01930000-0000-7000-8000-00000000a301",
+								"amount": 20
+							},
+							"seq": "4",
+							"receivedAt": "<instant>"
+						}
+					],
+					"nextSince": "4",
+					"hasMore": true
+				}
+			}
+		},
+		{
+			"kind": "server",
+			"request": {
+				"method": "GET",
+				"path": "/sync/pull?since=4&limit=2"
+			},
+			"response": {
+				"status": 200,
+				"body": {
+					"facts": [
+						{
+							"id": "01930000-0000-7000-8000-00000000b003",
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"type": "activity.logged",
+							"v": 1,
+							"occurredAt": "2026-11-21T04:00:00.000Z",
+							"data": {
+								"activityId": "01930000-0000-7000-8000-00000000a301",
+								"amount": 5
+							},
+							"seq": "5",
+							"receivedAt": "<instant>"
+						}
+					],
+					"nextSince": "5",
+					"hasMore": false,
+					"goals": [
+						{
+							"id": "01930000-0000-7000-8000-00000000a001",
+							"title": "Learn guitar",
+							"status": "running",
+							"rangeActiveDays": 7,
+							"startDate": "2026-11-20",
+							"timezone": "Asia/Jakarta",
+							"offlineCapPerMonth": null,
+							"areas": [
+								{
+									"id": "01930000-0000-7000-8000-00000000a101",
+									"name": "Guitar"
+								}
+							],
+							"createdAt": "<instant>",
+							"plan": {
+								"version": 1,
+								"curriculum": {
+									"areas": [
+										{
+											"id": "01930000-0000-7000-8000-00000000a101",
+											"name": "Guitar",
+											"milestones": [
+												{
+													"id": "01930000-0000-7000-8000-00000000a201",
+													"title": "Basics",
+													"days": 7,
+													"activities": [
+														{
+															"id": "01930000-0000-7000-8000-00000000a301",
+															"name": "Practise",
+															"unit": "minutes",
+															"floor": 10,
+															"stretch": 30,
+															"cadence": {
+																"kind": "daily"
+															}
+														}
+													]
+												}
+											]
+										}
+									]
+								},
+								"approvedAt": "2026-11-20T01:00:00.000Z"
+							}
+						}
+					],
+					"states": [
+						{
+							"goalId": "01930000-0000-7000-8000-00000000a001",
+							"state": {
+								"phase": "running",
+								"today": "2026-11-21",
+								"endDate": "2026-11-27",
+								"activeDaysUsed": 0,
+								"activeDaysTotal": 7,
+								"days": [
+									{
+										"date": "2026-11-20",
+										"status": "skipped",
+										"k": null
+									}
+								],
+								"required": [
+									{
+										"activityId": "01930000-0000-7000-8000-00000000a301",
+										"floor": 10,
+										"debtDue": 5,
+										"total": 15
+									}
+								],
+								"offlineToday": false,
+								"markedOffline": [],
+								"debt": [
+									{
+										"activityId": "01930000-0000-7000-8000-00000000a301",
+										"amount": 13,
+										"overdue": false
+									}
+								],
+								"areas": [
+									{
+										"areaId": "01930000-0000-7000-8000-00000000a101",
+										"multiplier": 1.25,
+										"base": 1.25,
+										"replanScale": 1
+									}
+								],
+								"allowance": [
+									{
+										"month": "2026-11",
+										"used": 1,
+										"cap": 10
+									}
+								],
+								"bankruptcies": [],
+								"lastSeq": "2"
+							}
+						}
+					]
+				}
+			}
+		}
+	],
+	"expect": {
+		"local": {
+			"facts": [
+				{
+					"id": "01930000-0000-7000-8000-00000000f001",
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"type": "goal.created",
+					"v": 1,
+					"occurredAt": "2026-11-20T01:00:00.000Z",
+					"data": {
+						"title": "Learn guitar",
+						"areas": [
+							{
+								"id": "01930000-0000-7000-8000-00000000a101",
+								"name": "Guitar"
+							}
+						],
+						"rangeActiveDays": 7,
+						"startDate": "2026-11-20",
+						"timezone": "Asia/Jakarta",
+						"caps": {}
+					},
+					"seq": "1",
+					"receivedAt": "<instant>"
+				},
+				{
+					"id": "01930000-0000-7000-8000-00000000f002",
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"type": "plan.approved",
+					"v": 1,
+					"occurredAt": "2026-11-20T01:00:00.000Z",
+					"data": {
+						"planVersion": 1,
+						"curriculum": {
+							"areas": [
+								{
+									"id": "01930000-0000-7000-8000-00000000a101",
+									"name": "Guitar",
+									"milestones": [
+										{
+											"id": "01930000-0000-7000-8000-00000000a201",
+											"title": "Basics",
+											"days": 7,
+											"activities": [
+												{
+													"id": "01930000-0000-7000-8000-00000000a301",
+													"name": "Practise",
+													"unit": "minutes",
+													"floor": 10,
+													"stretch": 30,
+													"cadence": {
+														"kind": "daily"
+													}
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					},
+					"seq": "2",
+					"receivedAt": "<instant>"
+				},
+				{
+					"id": "01930000-0000-7000-8000-00000000b001",
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"type": "activity.logged",
+					"v": 1,
+					"occurredAt": "2026-11-21T02:00:00.000Z",
+					"data": {
+						"activityId": "01930000-0000-7000-8000-00000000a301",
+						"amount": 15
+					},
+					"seq": "3",
+					"receivedAt": "<instant>"
+				},
+				{
+					"id": "01930000-0000-7000-8000-00000000b002",
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"type": "activity.logged",
+					"v": 1,
+					"occurredAt": "2026-11-21T03:00:00.000Z",
+					"data": {
+						"activityId": "01930000-0000-7000-8000-00000000a301",
+						"amount": 20
+					},
+					"seq": "4",
+					"receivedAt": "<instant>"
+				},
+				{
+					"id": "01930000-0000-7000-8000-00000000b003",
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"type": "activity.logged",
+					"v": 1,
+					"occurredAt": "2026-11-21T04:00:00.000Z",
+					"data": {
+						"activityId": "01930000-0000-7000-8000-00000000a301",
+						"amount": 5
+					},
+					"seq": "5",
+					"receivedAt": "<instant>"
+				}
+			],
+			"goals": [
+				{
+					"id": "01930000-0000-7000-8000-00000000a001",
+					"title": "Learn guitar",
+					"status": "running",
+					"rangeActiveDays": 7,
+					"startDate": "2026-11-20",
+					"timezone": "Asia/Jakarta",
+					"offlineCapPerMonth": null,
+					"areas": [
+						{
+							"id": "01930000-0000-7000-8000-00000000a101",
+							"name": "Guitar"
+						}
+					],
+					"createdAt": "<instant>"
+				}
+			],
+			"plans": [
+				{
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"version": 1,
+					"curriculum": {
+						"areas": [
+							{
+								"id": "01930000-0000-7000-8000-00000000a101",
+								"name": "Guitar",
+								"milestones": [
+									{
+										"id": "01930000-0000-7000-8000-00000000a201",
+										"title": "Basics",
+										"days": 7,
+										"activities": [
+											{
+												"id": "01930000-0000-7000-8000-00000000a301",
+												"name": "Practise",
+												"unit": "minutes",
+												"floor": 10,
+												"stretch": 30,
+												"cadence": {
+													"kind": "daily"
+												}
+											}
+										]
+									}
+								]
+							}
+						]
+					},
+					"approvedAt": "2026-11-20T01:00:00.000Z"
+				}
+			],
+			"states": [
+				{
+					"goalId": "01930000-0000-7000-8000-00000000a001",
+					"state": {
+						"phase": "running",
+						"today": "2026-11-21",
+						"endDate": "2026-11-27",
+						"activeDaysUsed": 0,
+						"activeDaysTotal": 7,
+						"days": [
+							{
+								"date": "2026-11-20",
+								"status": "skipped",
+								"k": null
+							}
+						],
+						"required": [
+							{
+								"activityId": "01930000-0000-7000-8000-00000000a301",
+								"floor": 10,
+								"debtDue": 5,
+								"total": 15
+							}
+						],
+						"offlineToday": false,
+						"markedOffline": [],
+						"debt": [
+							{
+								"activityId": "01930000-0000-7000-8000-00000000a301",
+								"amount": 13,
+								"overdue": false
+							}
+						],
+						"areas": [
+							{
+								"areaId": "01930000-0000-7000-8000-00000000a101",
+								"multiplier": 1.25,
+								"base": 1.25,
+								"replanScale": 1
+							}
+						],
+						"allowance": [
+							{
+								"month": "2026-11",
+								"used": 1,
+								"cap": 10
+							}
+						],
+						"bankruptcies": [],
+						"lastSeq": "2"
+					}
+				}
+			]
+		},
+		"outbox": []
+	}
+}

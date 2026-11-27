@@ -1,0 +1,68 @@
+# Start the API (`dotnet run --project src/Tsundoku.AppHost`, or `dotnet run --project src/Tsundoku.Api`).
+# Get a development token one time, and paste it below:
+#   dotnet user-jwts create --project src/Tsundoku.Api --name alice --audience tsundoku-api
+@baseUrl = http://localhost:5080
+@token = paste-the-token-here
+
+### Liveness and readiness → 200 (no token needed)
+GET {{baseUrl}}/health/ready
+
+### No token → 401
+GET {{baseUrl}}/api/todo-lists
+
+### Create a list → 201 Created + Location, body is only { id } (CQRS: read it with GET)
+# @name create
+POST {{baseUrl}}/api/todo-lists
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Groceries"
+}
+
+### Add an item → 201
+# @name addItem
+POST {{baseUrl}}/api/todo-lists/{{create.response.body.$.id}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Milk"
+}
+
+### Complete the item → 204 (a repeated call → 204, nothing changes)
+POST {{baseUrl}}/api/todo-lists/{{create.response.body.$.id}}/items/{{addItem.response.body.$.id}}/complete
+Authorization: Bearer {{token}}
+
+### Get the list → 200 (isDone: true, version: 2)
+GET {{baseUrl}}/api/todo-lists/{{create.response.body.$.id}}
+Authorization: Bearer {{token}}
+
+### My lists, newest first → 200
+GET {{baseUrl}}/api/todo-lists?page=1&pageSize=20&search=groc
+Authorization: Bearer {{token}}
+
+### Rename → 204
+PUT {{baseUrl}}/api/todo-lists/{{create.response.body.$.id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Food"
+}
+
+### A misspelled property → 400 { code: "bad_request" }
+POST {{baseUrl}}/api/todo-lists
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titel": "Groceries"
+}
+
+### Delete → 204
+DELETE {{baseUrl}}/api/todo-lists/{{create.response.body.$.id}}
+Authorization: Bearer {{token}}
+
+### OpenAPI document (Development) — interactive UI at /scalar
+GET {{baseUrl}}/openapi/v1.json

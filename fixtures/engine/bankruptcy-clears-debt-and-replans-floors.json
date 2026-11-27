@@ -1,0 +1,223 @@
+{
+	"name": "bankruptcy-clears-debt-and-replans-floors",
+	"facts": [
+		{
+			"type": "goal.created",
+			"occurredAt": "2026-02-20T00:00:00Z",
+			"data": {
+				"title": "Goal",
+				"areas": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000a1",
+						"name": "Practice"
+					}
+				],
+				"rangeActiveDays": 30,
+				"startDate": "2026-03-02",
+				"timezone": "Asia/Jakarta",
+				"caps": {}
+			}
+		},
+		{
+			"type": "plan.approved",
+			"occurredAt": "2026-02-20T01:00:00Z",
+			"data": {
+				"planVersion": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000a1",
+							"name": "Practice",
+							"milestones": [
+								{
+									"id": "00000000-0000-4000-8000-0000000000c1",
+									"title": "Core",
+									"days": 100,
+									"activities": [
+										{
+											"id": "00000000-0000-4000-8000-0000000000b1",
+											"name": "Act1",
+											"unit": "minutes",
+											"floor": 40,
+											"stretch": 80,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-02T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-03T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-04T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-05T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-06T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-07T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 1
+			}
+		}
+	],
+	"checks": [
+		{
+			"today": "2026-03-04",
+			"expect": {
+				"debtExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"amount": 49,
+						"overdue": false
+					},
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"amount": 53,
+						"overdue": false
+					}
+				],
+				"bankruptcies": [],
+				"areas": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"multiplier": 1.35,
+						"base": 1.25,
+						"replanScale": 1
+					}
+				]
+			}
+		},
+		{
+			"today": "2026-03-05",
+			"expect": {
+				"debtExactly": [],
+				"bankruptcies": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"date": "2026-03-04"
+					}
+				],
+				"areas": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"multiplier": 1.25,
+						"base": 1.25,
+						"replanScale": 0.8
+					}
+				],
+				"requiredExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"floor": 32,
+						"debtDue": 0,
+						"total": 32
+					}
+				]
+			}
+		},
+		{
+			"today": "2026-03-07",
+			"expect": {
+				"debtExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"amount": 39,
+						"overdue": false
+					},
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"amount": 42,
+						"overdue": false
+					}
+				],
+				"bankruptcies": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"date": "2026-03-04"
+					}
+				],
+				"areas": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"multiplier": 1.35,
+						"base": 1.25,
+						"replanScale": 0.8
+					}
+				]
+			}
+		},
+		{
+			"today": "2026-03-08",
+			"expect": {
+				"debtExactly": [],
+				"bankruptcies": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"date": "2026-03-04"
+					},
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"date": "2026-03-07"
+					}
+				],
+				"areas": [
+					{
+						"areaId": "00000000-0000-4000-8000-0000000000a1",
+						"multiplier": 1.25,
+						"base": 1.25,
+						"replanScale": 0.64
+					}
+				],
+				"requiredExactly": [
+					{
+						"activityId": "00000000-0000-4000-8000-0000000000b1",
+						"floor": 26,
+						"debtDue": 0,
+						"total": 26
+					}
+				]
+			}
+		}
+	]
+}

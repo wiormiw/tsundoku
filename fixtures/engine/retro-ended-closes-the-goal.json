@@ -1,0 +1,134 @@
+{
+	"name": "retro-ended-closes-the-goal",
+	"facts": [
+		{
+			"type": "goal.created",
+			"occurredAt": "2026-02-20T00:00:00Z",
+			"data": {
+				"title": "Goal",
+				"areas": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000a1",
+						"name": "Practice"
+					}
+				],
+				"rangeActiveDays": 3,
+				"startDate": "2026-03-02",
+				"timezone": "Asia/Jakarta",
+				"caps": {}
+			}
+		},
+		{
+			"type": "plan.approved",
+			"occurredAt": "2026-02-20T01:00:00Z",
+			"data": {
+				"planVersion": 1,
+				"curriculum": {
+					"areas": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000a1",
+							"name": "Practice",
+							"milestones": [
+								{
+									"id": "00000000-0000-4000-8000-0000000000c1",
+									"title": "Core",
+									"days": 100,
+									"activities": [
+										{
+											"id": "00000000-0000-4000-8000-0000000000b1",
+											"name": "Drill",
+											"unit": "minutes",
+											"floor": 10,
+											"stretch": 20,
+											"cadence": {
+												"kind": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-02T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 10
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-03T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 10
+			}
+		},
+		{
+			"type": "activity.logged",
+			"occurredAt": "2026-03-04T05:00:00Z",
+			"data": {
+				"activityId": "00000000-0000-4000-8000-0000000000b1",
+				"amount": 10
+			}
+		},
+		{
+			"type": "retro.ended",
+			"occurredAt": "2026-03-06T05:00:00Z",
+			"data": {}
+		}
+	],
+	"checks": [
+		{
+			"today": "2026-03-06",
+			"expect": {
+				"phase": "retrospective",
+				"days": [
+					{
+						"date": "2026-03-05",
+						"status": "retrospective",
+						"k": null
+					}
+				],
+				"absentDays": ["2026-03-06"]
+			}
+		},
+		{
+			"today": "2026-03-12",
+			"expect": {
+				"phase": "ended",
+				"endDate": "2026-03-04",
+				"activeDaysUsed": 3,
+				"daysCount": 5,
+				"absentDays": ["2026-03-07", "2026-03-11"]
+			}
+		},
+		{
+			"today": "2026-03-08",
+			"expect": {
+				"phase": "ended",
+				"endDate": "2026-03-04",
+				"activeDaysUsed": 3,
+				"days": [
+					{
+						"date": "2026-03-05",
+						"status": "retrospective",
+						"k": null
+					},
+					{
+						"date": "2026-03-06",
+						"status": "retrospective",
+						"k": null
+					}
+				],
+				"absentDays": ["2026-03-07"],
+				"daysCount": 5,
+				"requiredExactly": []
+			}
+		}
+	]
+}
