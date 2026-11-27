@@ -60,6 +60,27 @@ public sealed class SnapshotPropertyTests
         return facts;
     }
 
+    /// <summary>Resume from every closed day's snapshot to every later today; returns the resumes checked.</summary>
+    private static int AssertResumes(IReadOnlyList<Fact> facts, DateOnly last, Rules rules, string label)
+    {
+        var timezone = facts.OfType<Fact.GoalCreated>().Single().Data.Timezone;
+        var resumes = 0;
+        foreach (var closed in Fold.FoldGoal(new FoldInput(facts, last, rules)).Days.Select(d => d.Date))
+        {
+            var snapshot = Fold.FoldGoal(new FoldInput(facts, closed.AddDays(1), rules));
+            var frozen = Scenarios.Text(snapshot);
+            var rest = facts.Where(f => Calendar.LocalDate(f.OccurredAt, timezone) > closed).ToList();
+            for (var today = closed.AddDays(1); today <= last; today = today.AddDays(1))
+            {
+                var full = Scenarios.Text(Fold.FoldGoal(new FoldInput(facts, today, rules)));
+                Scenarios.Text(Fold.FoldGoal(new FoldInput(rest, today, rules, snapshot))).ShouldBe(full, $"{label} ({timezone}): resume from {closed} to {today}");
+                resumes++;
+            }
+            Scenarios.Text(snapshot).ShouldBe(frozen, $"{label}: the snapshot is not mutated");
+        }
+        return resumes;
+    }
+
     [Fact]
     public void Resuming_from_any_closed_day_equals_the_full_fold_on_generated_logs()
     {
@@ -67,22 +88,20 @@ public sealed class SnapshotPropertyTests
         var resumes = 0;
         for (var run = 0; run < 60; run++)
         {
-            var facts = Generate(random, out var timezone, out var last, out var rules);
-            var closedDays = Fold.FoldGoal(new FoldInput(facts, last, rules)).Days.Select(d => d.Date).ToList();
-            foreach (var closed in closedDays)
-            {
-                var snapshot = Fold.FoldGoal(new FoldInput(facts, closed.AddDays(1), rules));
-                var frozen = Scenarios.Text(snapshot);
-                var rest = facts.Where(f => Calendar.LocalDate(f.OccurredAt, timezone) > closed).ToList();
-                for (var today = closed.AddDays(1); today <= last; today = today.AddDays(1))
-                {
-                    var full = Scenarios.Text(Fold.FoldGoal(new FoldInput(facts, today, rules)));
-                    Scenarios.Text(Fold.FoldGoal(new FoldInput(rest, today, rules, snapshot))).ShouldBe(full, $"run {run} ({timezone}): resume from {closed} to {today}");
-                    resumes++;
-                }
-                Scenarios.Text(snapshot).ShouldBe(frozen, "the snapshot is not mutated");
-            }
+            var facts = Generate(random, out _, out var last, out var rules);
+            resumes += AssertResumes(facts, last, rules, $"run {run}");
         }
         resumes.ShouldBeGreaterThan(500);
+    }
+
+    public static TheoryData<string> Files => [.. Scenarios.Files];
+
+    // Every fact type the tables hold (debt.rated, retro.*, revision.approved, settings.changed) goes through it.
+    [Theory]
+    [MemberData(nameof(Files))]
+    public void Resuming_from_any_closed_day_equals_the_full_fold_on_every_scenario_table(string file)
+    {
+        var scenario = Scenarios.Load(file);
+        AssertResumes(Scenarios.ExpandFacts(scenario), scenario.Checks.Max(c => c.Today), Scenarios.RulesOf(scenario), file);
     }
 }
