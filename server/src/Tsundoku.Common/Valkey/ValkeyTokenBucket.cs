@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
@@ -12,14 +14,14 @@ namespace Tsundoku.Common.Valkey;
 internal sealed partial class ValkeyTokenBucket(
     IConnectionMultiplexer valkey, IOptions<RateLimitOptions> options, TimeProvider clock, ILogger<ValkeyTokenBucket> logger)
 {
-    // Prepared once: StackExchange.Redis sends EVALSHA and loads the script again on NOSCRIPT (a Valkey restart).
-    private static readonly LuaScript Script = LuaScript.Prepare("""
-        local capacity = tonumber(@Limit)
-        local window_ms = tonumber(@PeriodMs)
+    // KEYS[1]: the bucket. ARGV[1]: limit. ARGV[2]: period in milliseconds.
+    private const string Script = """
+        local capacity = tonumber(ARGV[1])
+        local window_ms = tonumber(ARGV[2])
         local time = redis.call('TIME')
         local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
         local rate = capacity / window_ms
-        local state = redis.call('HMGET', @Key, 'tokens', 'at')
+        local state = redis.call('HMGET', KEYS[1], 'tokens', 'at')
         local tokens = tonumber(state[1])
         local at = tonumber(state[2])
         if tokens == nil or at == nil then
@@ -35,10 +37,16 @@ internal sealed partial class ValkeyTokenBucket(
         else
           wait_ms = math.ceil((1 - tokens) / rate)
         end
-        redis.call('HSET', @Key, 'tokens', tostring(tokens), 'at', now)
-        redis.call('PEXPIRE', @Key, window_ms)
+        redis.call('HSET', KEYS[1], 'tokens', tostring(tokens), 'at', now)
+        redis.call('PEXPIRE', KEYS[1], window_ms)
         return { allowed, wait_ms }
-        """);
+        """;
+
+    // The hash is computed once; every request sends EVALSHA, so the script text never travels (LuaScript.EvaluateAsync
+    // may send EVAL). SHA1 is Valkey's script id, not a security use.
+#pragma warning disable CA5350
+    private static readonly byte[] Sha1 = SHA1.HashData(Encoding.UTF8.GetBytes(Script));
+#pragma warning restore CA5350
 
     private static readonly RedisKey Prefix = "ratelimit:"u8.ToArray();
 
@@ -49,14 +57,29 @@ internal sealed partial class ValkeyTokenBucket(
     {
         try
         {
-            var arguments = new Arguments(new RedisKey(key).Prepend(Prefix), bucket.TokenLimit, (long)bucket.ReplenishmentPeriod.TotalMilliseconds);
-            var reply = (long[]?)await Script.EvaluateAsync(valkey.GetDatabase(), arguments).WaitAsync(_options.Timeout) ?? [];
+            var reply = await EvaluateAsync(key, bucket).WaitAsync(_options.Timeout);
             return reply is [1, ..] ? new RateLimitDecision(true, TimeSpan.Zero) : new RateLimitDecision(false, TimeSpan.FromMilliseconds(reply is [_, var waitMs] ? waitMs : 1000));
         }
         catch (Exception exception) when (exception is RedisException or TimeoutException)
         {
             WarnOnce(exception);
             return new RateLimitDecision(true, TimeSpan.Zero);
+        }
+    }
+
+    private async Task<long[]> EvaluateAsync(string key, TokenBucketOptions bucket)
+    {
+        RedisKey[] keys = [new RedisKey(key).Prepend(Prefix)];
+        RedisValue[] values = [bucket.TokenLimit, (long)bucket.ReplenishmentPeriod.TotalMilliseconds];
+        var database = valkey.GetDatabase();
+        try
+        {
+            return (long[]?)await database.ScriptEvaluateAsync(Sha1, keys, values) ?? [];
+        }
+        catch (RedisServerException exception) when (exception.Message.StartsWith("NOSCRIPT", StringComparison.Ordinal))
+        {
+            // Valkey restarted or flushed its scripts: EVAL runs the text and caches it again for the next EVALSHA.
+            return (long[]?)await database.ScriptEvaluateAsync(Script, keys, values) ?? [];
         }
     }
 
@@ -71,7 +94,4 @@ internal sealed partial class ValkeyTokenBucket(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Rate limit unavailable; the request is let through.")]
     private partial void LogUnavailable(Exception exception);
-
-    // The names are the script's @parameters.
-    private readonly record struct Arguments(RedisKey Key, long Limit, long PeriodMs);
 }

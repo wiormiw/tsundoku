@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Tsundoku.Common.Http;
@@ -33,7 +35,7 @@ internal sealed class ValkeyRateLimitMiddleware(RequestDelegate next, ValkeyToke
             if (policy.PolicyName != RateLimitPolicies.Credentials)
                 throw new InvalidOperationException($"Unknown rate limit policy '{policy.PolicyName}'.");
             limit = _limits.Credentials;
-            key = $"credentials:ip:{address}";
+            key = ClientKey("credentials:ip:", address, _limits.Ipv6PrefixLength);
         }
         else if (context.User.FindFirst(UserClaims.Subject)?.Value is { } subject)
         {
@@ -43,7 +45,7 @@ internal sealed class ValkeyRateLimitMiddleware(RequestDelegate next, ValkeyToke
         else
         {
             limit = _limits.Anonymous;
-            key = $"ip:{address}";
+            key = ClientKey("ip:", address, _limits.Ipv6PrefixLength);
         }
 
         var decision = await bucket.TryTakeAsync(key, limit);
@@ -59,5 +61,22 @@ internal sealed class ValkeyRateLimitMiddleware(RequestDelegate next, ValkeyToke
             statusCode: StatusCodes.Status429TooManyRequests,
             title: "Too many requests.",
             extensions: new Dictionary<string, object?> { ["code"] = "rate_limited" }).ExecuteAsync(context);
+    }
+
+    /// <summary>The bucket key of a client address: an IPv6 address is cut to its prefix, an IPv4-mapped one is its IPv4 form.</summary>
+    internal static string ClientKey(string prefix, IPAddress? address, int ipv6PrefixLength)
+    {
+        if (address is { IsIPv4MappedToIPv6: true }) address = address.MapToIPv4();
+        if (address is not { AddressFamily: AddressFamily.InterNetworkV6 }) return $"{prefix}{address}";
+
+        Span<byte> bytes = stackalloc byte[16];
+        address.TryWriteBytes(bytes, out _);
+        var whole = ipv6PrefixLength / 8;
+        var rest = ipv6PrefixLength % 8;
+        if (rest != 0) bytes[whole++] &= (byte)(0xFF << (8 - rest));
+        bytes[whole..].Clear();
+        Span<char> hex = stackalloc char[32];
+        Convert.TryToHexStringLower(bytes, hex, out _);
+        return $"{prefix}{hex}";
     }
 }

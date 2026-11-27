@@ -103,7 +103,7 @@ An event payload must stay readable by the next version of the app, so add prope
 ## Before production
 
 - [ ] Set `ApiLimits:KnownProxies` to the address of your reverse proxy.
-- [ ] Set `ApiLimits:RequestsPerMinute`. The limit is for each instance (tip 15.10).
+- [ ] Review `RateLimits:Credentials`, `RateLimits:User` and `RateLimits:Anonymous` (`TokenLimit` and `ReplenishmentPeriod`). The buckets live in Valkey and are shared by every instance (tip 15.10); `RateLimits:Ipv6PrefixLength` sets how many bits of an IPv6 address make one client.
 - [ ] Run the migration bundle (`--target migrate`) as a deploy step, with expand/contract changes (tip 28.01).
 - [ ] Monitor the outbox: alert, in the outbox table of each module, on rows where `processed_at IS NULL AND attempts >= MaxAttempts` (dead letters), and on old unprocessed rows.
 - [ ] Delete processed outbox rows after some days, with a scheduled job.

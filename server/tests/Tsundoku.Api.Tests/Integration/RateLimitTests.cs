@@ -50,6 +50,37 @@ public sealed class RateLimitTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task A_flushed_script_cache_is_loaded_again()
+    {
+        Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");
+        var valkey = factory.Services.GetRequiredService<IConnectionMultiplexer>();
+        var bucket = NewBucket(TimeProvider.System);
+        (await bucket.TryTakeAsync($"test:{Guid.NewGuid():N}", FivePerMinute)).Allowed.ShouldBeTrue();
+
+        // SCRIPT FLUSH is an admin command: the app's multiplexer refuses it.
+        var admin = ConfigurationOptions.Parse(valkey.Configuration);
+        admin.AllowAdmin = true;
+        await using var adminValkey = await ConnectionMultiplexer.ConnectAsync(admin);
+        await adminValkey.GetServer(adminValkey.GetEndPoints()[0]).ScriptFlushAsync();
+
+        var key = $"test:{Guid.NewGuid():N}";
+        for (var i = 0; i < 5; i++) (await bucket.TryTakeAsync(key, FivePerMinute)).Allowed.ShouldBeTrue();
+        (await bucket.TryTakeAsync(key, FivePerMinute)).Allowed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Ipv6_addresses_share_a_bucket_by_prefix_and_mapped_ones_are_ipv4()
+    {
+        string Key(string address, int prefix = 64) => ValkeyRateLimitMiddleware.ClientKey("ip:", IPAddress.Parse(address), prefix);
+
+        Key("2001:db8:1:2::1").ShouldBe(Key("2001:db8:1:2:ffff:ffff:ffff:ffff"));
+        Key("2001:db8:1:2::1").ShouldNotBe(Key("2001:db8:1:3::1"));
+        Key("2001:db8:1:2::1", 56).ShouldBe(Key("2001:db8:1:3::1", 56));
+        Key("::ffff:203.0.113.7").ShouldBe(Key("203.0.113.7"));
+        Key("203.0.113.7").ShouldBe("ip:203.0.113.7");
+    }
+
+    [Fact]
     public async Task Two_instances_share_one_bucket_on_valkeys_clock()
     {
         Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");

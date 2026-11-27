@@ -27,4 +27,11 @@ internal sealed class RateLimitOptions
     /// <summary>The least time between two warnings that Valkey is unavailable, so an outage does not log for each request.</summary>
     [Range(typeof(TimeSpan), "00:00:01", "01:00:00")]
     public TimeSpan WarningInterval { get; init; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// IPv6 clients share a bucket by this many leading bits (a host usually holds a whole /64, so one address per
+    /// bucket would give it 2^64 buckets). IPv4 and IPv4-mapped addresses use the whole address.
+    /// </summary>
+    [Range(16, 128)]
+    public int Ipv6PrefixLength { get; init; } = 64;
 }
