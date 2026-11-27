@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tsundoku.Common.Domain;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Messaging;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Todos.Domain;
 using Tsundoku.Modules.Todos.Features;
 using Tsundoku.Modules.Todos.Features.GetTodoList;
@@ -210,11 +211,15 @@ public sealed class TodoListEndpointTests(ApiFactory factory)
         await using var second = factory.Services.CreateAsyncScope();
         var firstDb = first.ServiceProvider.GetRequiredService<TodosDbContext>();
         var secondDb = second.ServiceProvider.GetRequiredService<TodosDbContext>();
+        // Row-level security shows the list only inside a transaction of its owner, as the pipeline runs it.
+        await using var firstTransaction = await RowLevelSecurity.BeginTransactionAsync(firstDb.Database, owner, Ct);
+        await using var secondTransaction = await RowLevelSecurity.BeginTransactionAsync(secondDb.Database, owner, Ct);
         var firstCopy = await firstDb.TodoLists.SingleAsync(list => list.Id == id && list.OwnerId == owner, Ct);
         var secondCopy = await secondDb.TodoLists.SingleAsync(list => list.Id == id && list.OwnerId == owner, Ct);
 
         firstCopy.Rename(TitleOf("Food"));
         await firstDb.SaveChangesAsync(Ct);
+        await firstTransaction.CommitAsync(Ct);
         // A change to an item conflicts too: the version of the whole aggregate goes up.
         secondCopy.AddItem(TitleOf("Milk"));
 

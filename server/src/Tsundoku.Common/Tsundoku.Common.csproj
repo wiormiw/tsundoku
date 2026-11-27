@@ -21,5 +21,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Tsundoku.Architecture.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Api.Tests" />
   </ItemGroup>
 </Project>

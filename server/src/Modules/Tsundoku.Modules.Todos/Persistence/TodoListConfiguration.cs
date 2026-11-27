@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Todos.Domain;
 
 namespace Tsundoku.Modules.Todos.Persistence;
@@ -16,6 +17,8 @@ internal sealed class TodoListConfiguration : IEntityTypeConfiguration<TodoList>
             title.Property(value => value.Value).HasColumnName("title").HasMaxLength(Title.MaxLength));
         // Each change of the aggregate raises the version, so a parallel change fails (tip 10.23).
         builder.Property(list => list.Version).IsConcurrencyToken();
+        // The owner policy reads this column (row-level security).
+        builder.Property(list => list.OwnerId).HasColumnName(RowLevelSecurity.OwnerColumn);
         builder.Ignore(list => list.IsDone);
         builder.Ignore(list => list.DomainEvents);
 

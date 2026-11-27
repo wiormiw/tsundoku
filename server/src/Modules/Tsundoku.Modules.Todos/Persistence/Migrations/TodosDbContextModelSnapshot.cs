@@ -17,7 +17,7 @@ partial class TodosDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261127053016_AppRole";
+    public override string LastMigrationId => "20261127053510_RowLevelSecurity";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -87,7 +87,7 @@ partial class TodosDbContextModelSnapshot : ModelSnapshot
                     .IsRequired()
                     .HasMaxLength(128)
                     .HasColumnType("character varying(128)")
-                    .HasColumnName("owner_id");
+                    .HasColumnName("user_id");
 
                 b.Property<DateTimeOffset?>("UpdatedAt")
                     .HasColumnType("timestamp with time zone")
@@ -113,7 +113,7 @@ partial class TodosDbContextModelSnapshot : ModelSnapshot
                     .HasName("pk_todo_lists");
 
                 b.HasIndex("OwnerId", "CreatedAt")
-                    .HasDatabaseName("ix_todo_lists_owner_id_created_at");
+                    .HasDatabaseName("ix_todo_lists_user_id_created_at");
 
                 b.ToTable("todo_lists", "todos");
             });

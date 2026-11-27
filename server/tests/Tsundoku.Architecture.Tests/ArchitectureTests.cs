@@ -156,6 +156,36 @@ public sealed partial class ArchitectureTests
     [GeneratedRegex(@"\bSaveChanges(?:Async)?\b|\bIUnitOfWork\b")]
     private static partial Regex SavesChanges();
 
+    // Row-level security: one place sets the user, and only the pipeline reaches a context.
+
+    [Fact]
+    public void Only_RowLevelSecurity_sets_the_user()
+    {
+        var allowed = Path.Combine(SourceFolder(), "Tsundoku.Common", "Persistence", "RowLevelSecurity.cs");
+        var setters = SourceFiles().Where(path => path != allowed && SetsTheUser().IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(SourceFolder(), path));
+        setters.ShouldBeEmpty("the user of a transaction is set in RowLevelSecurity.BeginTransactionAsync only");
+    }
+
+    [GeneratedRegex(@"set_config|app\.user_id")]
+    private static partial Regex SetsTheUser();
+
+    [Fact]
+    public void Only_Common_opens_transactions()
+    {
+        var opening = SourceFiles().Where(path => path.StartsWith(Path.Combine(SourceFolder(), "Modules"), StringComparison.Ordinal)
+                && File.ReadAllText(path).Contains("BeginTransaction", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(SourceFolder(), path));
+        opening.ShouldBeEmpty("the pipeline opens the transaction and sets its user; a module's own would have no user");
+    }
+
+    [Theory]
+    [MemberData(nameof(EachModule))]
+    public void Endpoints_do_not_touch_persistence(Assembly module) => Holds(
+        Types.InAssembly(module).That().HaveNameEndingWith("Endpoint").ShouldNot().HaveDependencyOnAny(
+            "Microsoft.EntityFrameworkCore", $"{module.GetName().Name}.Persistence").GetResult(),
+        "an endpoint reaches a context only through the pipeline, which sets the user");
+
     // Code style.
 
     [Fact]

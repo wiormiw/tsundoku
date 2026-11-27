@@ -36,8 +36,8 @@ public static class TodosModule
         services.AddValidator<ListTodoListsQuery, ListTodoListsQueryValidator>();
 
         services.AddCommand<CreateTodoListCommand, IdResponse, CreateTodoListHandler, TodosDbContext>();
-        services.AddQuery<ListTodoListsQuery, PagedResponse<TodoListSummaryResponse>, ListTodoListsHandler>();
-        services.AddQuery<GetTodoListQuery, TodoListResponse, GetTodoListHandler>();
+        services.AddQuery<ListTodoListsQuery, PagedResponse<TodoListSummaryResponse>, ListTodoListsHandler, TodosDbContext>();
+        services.AddQuery<GetTodoListQuery, TodoListResponse, GetTodoListHandler, TodosDbContext>();
         services.AddCommand<RenameTodoListCommand, Success, RenameTodoListHandler, TodosDbContext>();
         services.AddCommand<AddTodoItemCommand, IdResponse, AddTodoItemHandler, TodosDbContext>();
         services.AddCommand<CompleteTodoItemCommand, Success, CompleteTodoItemHandler, TodosDbContext>();
