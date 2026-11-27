@@ -14,10 +14,8 @@ A feature is one folder inside its module, not a file in each of four layer proj
 dotnet user-secrets set Parameters:postgres-password <password> --project src/Tsundoku.AppHost
 dotnet run --project src/Tsundoku.AppHost
 
-# 2. A token for the API (one time). Paste it into src/Tsundoku.Api/Tsundoku.Api.http.
-dotnet user-jwts create --project src/Tsundoku.Api --name alice --audience tsundoku-api
 
-# 3. Tests (Docker must run for the integration tests).
+# 2. Tests (Docker must run for the integration tests).
 dotnet test --solution Tsundoku.slnx
 ```
 
@@ -104,7 +102,6 @@ An event payload must stay readable by the next version of the app, so add prope
 
 ## Before production
 
-- [ ] Set `Authentication:Schemes:Bearer:Authority` and `ValidAudiences`. The app does not start without an authority or signing keys.
 - [ ] Set `ApiLimits:KnownProxies` to the address of your reverse proxy.
 - [ ] Set `ApiLimits:RequestsPerMinute`. The limit is for each instance (tip 15.10).
 - [ ] Run the migration bundle (`--target migrate`) as a deploy step, with expand/contract changes (tip 28.01).

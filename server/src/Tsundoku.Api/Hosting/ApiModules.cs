@@ -1,4 +1,5 @@
 using Tsundoku.Common.Persistence;
+using Tsundoku.Modules.Accounts;
 using Tsundoku.Modules.Todos;
 
 namespace Tsundoku.Api.Hosting;
@@ -8,6 +9,7 @@ internal static class ApiModules
 {
     public static WebApplicationBuilder AddModules(this WebApplicationBuilder builder)
     {
+        builder.AddAccountsModule();
         builder.AddTodosModule();
         return builder;
     }
@@ -23,6 +25,7 @@ internal static class ApiModules
     /// <summary>Migrates every module as the owner, then makes sure the API's login role exists with its password.</summary>
     public static async Task MigrateModulesAsync(this WebApplication app)
     {
+        await app.MigrateAccountsAsync();
         await app.MigrateTodosAsync();
 
         var connectionStrings = app.Configuration;

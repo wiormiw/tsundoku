@@ -13,6 +13,7 @@
     <Project Path="src/Tsundoku.ServiceDefaults/Tsundoku.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/Tsundoku.Modules.Accounts/Tsundoku.Modules.Accounts.csproj" />
     <Project Path="src/Modules/Tsundoku.Modules.Todos/Tsundoku.Modules.Todos.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
@@ -21,6 +22,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Tsundoku.Api.Tests/Tsundoku.Api.Tests.csproj" />
     <Project Path="tests/Tsundoku.Architecture.Tests/Tsundoku.Architecture.Tests.csproj" />
+    <Project Path="tests/Tsundoku.Modules.Accounts.Tests/Tsundoku.Modules.Accounts.Tests.csproj" />
     <Project Path="tests/Tsundoku.Modules.Todos.Tests/Tsundoku.Modules.Todos.Tests.csproj" />
     <Project Path="tests/Tsundoku.Engine.Tests/Tsundoku.Engine.Tests.csproj" />
   </Folder>

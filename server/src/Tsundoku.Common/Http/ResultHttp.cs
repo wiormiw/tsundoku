@@ -19,6 +19,8 @@ public static class ResultHttp
             Extensions = { ["code"] = invalid.Code },
         }),
         NotFoundError notFound => Problem(StatusCodes.Status404NotFound, "Not found.", notFound),
+        UnauthorizedError unauthorized => Problem(StatusCodes.Status401Unauthorized, "Unauthorized.", unauthorized),
+        ForbiddenError forbidden => Problem(StatusCodes.Status403Forbidden, "Forbidden.", forbidden),
         ConflictError conflict => Problem(StatusCodes.Status409Conflict, "Conflict.", conflict),
     };
 

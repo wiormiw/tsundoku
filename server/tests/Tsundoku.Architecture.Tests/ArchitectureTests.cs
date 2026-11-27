@@ -4,6 +4,7 @@ using Tsundoku.Common.Domain;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Http;
 using Tsundoku.Common.Messaging;
+using Tsundoku.Modules.Accounts;
 using Tsundoku.Modules.Todos;
 
 namespace Tsundoku.Architecture.Tests;
@@ -20,7 +21,7 @@ public sealed partial class ArchitectureTests
     private static readonly Assembly Engine = typeof(Tsundoku.Engine.Rules).Assembly;
 
     /// <summary>Add each new module here: each rule below then covers it.</summary>
-    private static readonly Assembly[] Modules = [typeof(TodosModule).Assembly];
+    private static readonly Assembly[] Modules = [typeof(AccountsModule).Assembly, typeof(TodosModule).Assembly];
 
     private static readonly Assembly[] Source = [Common, .. Modules, Api, Engine];
 

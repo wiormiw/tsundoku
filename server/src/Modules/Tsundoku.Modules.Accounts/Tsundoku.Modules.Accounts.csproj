@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The accounts module: users, Identity bearer tokens, sessions and settings. Its only public type is AccountsModule: everything else is internal.
+    It owns the "accounts" schema, its migrations and its outbox table. It references Common and no other module.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tsundoku.Common\Tsundoku.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
+    <!-- Task 7 verifies Google ID tokens with it. -->
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tsundoku.Modules.Accounts.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Api.Tests" />
+    <InternalsVisibleTo Include="Tsundoku.Architecture.Tests" />
+  </ItemGroup>
+</Project>

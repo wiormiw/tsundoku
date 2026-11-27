@@ -9,11 +9,11 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tsundoku.Common\Tsundoku.Common.csproj" />
+    <ProjectReference Include="..\Modules\Tsundoku.Modules.Accounts\Tsundoku.Modules.Accounts.csproj" />
     <ProjectReference Include="..\Modules\Tsundoku.Modules.Todos\Tsundoku.Modules.Todos.csproj" />
     <ProjectReference Include="..\Tsundoku.ServiceDefaults\Tsundoku.ServiceDefaults.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>

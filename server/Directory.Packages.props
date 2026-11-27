@@ -2,7 +2,8 @@
   <PropertyGroup>
     <!--
       The Npgsql EF Core 11 provider is a release candidate and pins EF Core to exactly this build.
-      Move all EF packages to 11.0.x together when Npgsql 11 is GA.
+      Npgsql 11.0.0 GA was published 2026-11-20: move all EF packages (and the two ASP.NET EF stores) to 11.0.0 together
+      once it is two weeks old (2026-12-04).
     -->
     <EfCoreVersion>11.0.0-rc.3.26522.148</EfCoreVersion>
   </PropertyGroup>
@@ -12,6 +13,9 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.3" />
+    <!-- Identity and Data Protection stores ship with EF Core: same build as EfCoreVersion. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="$(EfCoreVersion)" />
 
     <!-- Valkey (Redis protocol) -->
     <PackageVersion Include="StackExchange.Redis" Version="3.4.35" />
@@ -21,7 +25,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="11.0.0" />
 
     <!-- Api: HTTP, auth and the API reference -->
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.19.2" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.20.0" />
 

@@ -11,7 +11,8 @@ namespace Tsundoku.Api.Tests.Integration;
 public sealed class CatalogTests(ApiFactory factory)
 {
     /// <summary><c>schema.table</c> names of tables with a <c>user_id</c> that are read before a user is known, so they carry no policy.</summary>
-    internal static readonly FrozenSet<string> ExemptTables = FrozenSet.Create<string>(StringComparer.Ordinal, []);
+    internal static readonly FrozenSet<string> ExemptTables = FrozenSet.Create<string>(StringComparer.Ordinal,
+        ["accounts.user_claims", "accounts.user_logins", "accounts.user_tokens", "accounts.sessions"]);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

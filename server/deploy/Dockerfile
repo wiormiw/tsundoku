@@ -8,6 +8,7 @@ WORKDIR /src
 # Project files first, so the restore layer is reused until a dependency changes.
 COPY global.json dotnet-tools.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/Tsundoku.Common/Tsundoku.Common.csproj src/Tsundoku.Common/
+COPY src/Modules/Tsundoku.Modules.Accounts/Tsundoku.Modules.Accounts.csproj src/Modules/Tsundoku.Modules.Accounts/
 COPY src/Modules/Tsundoku.Modules.Todos/Tsundoku.Modules.Todos.csproj src/Modules/Tsundoku.Modules.Todos/
 COPY src/Tsundoku.ServiceDefaults/Tsundoku.ServiceDefaults.csproj src/Tsundoku.ServiceDefaults/
 COPY src/Tsundoku.Api/Tsundoku.Api.csproj src/Tsundoku.Api/
@@ -28,10 +29,10 @@ COPY --from=bundle /efbundle /efbundle
 ENTRYPOINT ["/efbundle"]
 
 # Chiseled: no shell, no package manager, and a non-root user by default (tip 27.01).
-# It has no ICU and no time zone data: the API sets InvariantGlobalization. When you need
-# time zones or cultures, use the 11.0-resolute-chiseled-extra image instead (tip 27.02).
+# The -extra image carries the IANA time zone data that the Accounts module validates against at startup
+# (plain chiseled has none, so the API would refuse to start). The API still sets InvariantGlobalization (no ICU use).
 # It has no curl either, so the orchestrator probes /health/live and /health/ready over HTTP.
-FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute-chiseled AS api
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute-chiseled-extra AS api
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080

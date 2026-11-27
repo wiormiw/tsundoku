@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -40,17 +39,8 @@ internal static class ApiHosting
             json.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         });
 
-        // Auth: validate JWTs from the identity provider in Authentication:Schemes:Bearer (tip 19.01).
+        // Auth: the accounts module registers the bearer scheme (Identity bearer tokens).
         // Every endpoint needs a user, unless it says AllowAnonymous (tip 19.04).
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(jwt =>
-        {
-            jwt.MapInboundClaims = false;
-            jwt.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
-        });
-        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Validate(jwt => !string.IsNullOrWhiteSpace(jwt.Authority) || jwt.TokenValidationParameters.IssuerSigningKeys?.Any() == true,
-                "Set Authentication:Schemes:Bearer:Authority, or run `dotnet user-jwts create` in Development.")
-            .ValidateOnStart();
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
         services.AddHttpContextAccessor();
@@ -61,7 +51,7 @@ internal static class ApiHosting
         {
             rates.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             rates.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context => RateLimitPartition.GetTokenBucketLimiter(
-                context.User.FindFirst(HttpCurrentUser.SubjectClaim)?.Value is { } subject
+                context.User.FindFirst(UserClaims.Subject)?.Value is { } subject
                     ? $"user:{subject}"
                     : $"ip:{context.Connection.RemoteIpAddress}",
                 _ => new TokenBucketRateLimiterOptions

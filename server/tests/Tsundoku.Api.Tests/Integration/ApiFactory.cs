@@ -71,8 +71,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:appdb", AppConnectionString);
         builder.UseSetting("ConnectionStrings:valkey", _valkey!.GetConnectionString());
         builder.UseSetting("Database:MigrateOnStartup", "true");
-        // The JWT options must be valid at startup, but the tests sign in with TestAuthHandler.
-        builder.UseSetting("Authentication:Schemes:Bearer:Authority", "https://identity.invalid/");
+        builder.UseSetting("Accounts:PublicBaseUrl", "http://localhost");
+        builder.UseSetting("Accounts:SignUpEnabled", "true");
         builder.UseSetting("ApiLimits:RequestsPerMinute", "100000");
         // The outbox reads often, so the tests see the events quickly.
         builder.UseSetting("Outbox:PollInterval", "00:00:00.050");
