@@ -2,6 +2,7 @@
 docs/
 .superpowers/
 *.plan.md
+.impeccable/
 
 # Dependencies and build output
 bin/
