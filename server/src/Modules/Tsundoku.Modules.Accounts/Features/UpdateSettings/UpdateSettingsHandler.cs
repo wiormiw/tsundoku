@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Identity;
 using Tsundoku.Common.Messaging;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Accounts.Domain;
 using Tsundoku.Modules.Accounts.Persistence;
 
@@ -21,8 +22,7 @@ internal sealed class UpdateSettingsHandler(AccountsDbContext db, ICurrentUser c
         var owner = current.Id;
         // One write per user at a time, until the commit: of two first writes the second sees the row and updates it,
         // instead of both inserting and one failing on the key. It runs in the decorator's transaction, so RLS still applies.
-        var lockKey = $"accounts.settings:{owner.Value}";
-        await db.Database.ExecuteSqlAsync($"select pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+        await AdvisoryLock.AcquireAsync(db.Database, "accounts.settings", owner.Value, cancellationToken);
 
         // An access token outlives its user by up to its lifetime, and the settings row has a foreign key to the user.
         var id = Guid.Parse(owner.Value);

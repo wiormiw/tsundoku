@@ -117,7 +117,7 @@ An event payload must stay readable by the next version of the app, so add prope
 
 ## Before production
 
-- [ ] Set `ApiLimits:KnownProxies` to the address of your reverse proxy.
+- [ ] Set `ApiLimits:KnownProxies` to the address your reverse proxy connects from (compose sets it to its network's gateway), and make the proxy send `X-Forwarded-For`. Only those addresses are trusted; otherwise every client shares one rate-limit bucket.
 - [ ] Review `RateLimits:Credentials`, `RateLimits:User` and `RateLimits:Anonymous` (`TokenLimit` and `ReplenishmentPeriod`). `RateLimits:Ipv6PrefixLength` sets how many bits of an IPv6 address make one client.
 - [ ] Run `dotnet Tsundoku.Api.dll migrate` (the compose `migrate` service) as a deploy step, with expand/contract changes (tip 28.01).
 - [ ] Back up `accounts.data_protection_keys`: without the key ring every issued token and confirmation link stops working.

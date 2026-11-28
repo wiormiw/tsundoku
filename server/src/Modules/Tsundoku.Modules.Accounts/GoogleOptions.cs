@@ -30,7 +30,10 @@ internal sealed class GoogleOptions
     [Range(typeof(TimeSpan), "00:00:01", "1.00:00:00")]
     public TimeSpan KeysRefreshInterval { get; init; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>The whole fetch of the discovery document or the keys, retries included (the standard resilience handler's total timeout).</summary>
-    [Range(typeof(TimeSpan), "00:00:01", "00:02:00")]
+    /// <summary>
+    /// The whole fetch of the discovery document or the keys, retries included (the client's timeout wraps its resilience handler).
+    /// At most 30 s: ServiceDefaults' standard resilience handler ends the call at its own 30 s total timeout, so more would do nothing.
+    /// </summary>
+    [Range(typeof(TimeSpan), "00:00:01", "00:00:30")]
     public TimeSpan HttpTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }

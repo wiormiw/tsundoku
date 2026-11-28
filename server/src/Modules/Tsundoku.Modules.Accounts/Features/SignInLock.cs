@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Accounts.Persistence;
 
 namespace Tsundoku.Modules.Accounts.Features;
@@ -11,8 +11,7 @@ internal static class SignInLock
 {
     public static async Task AcquireAsync(AccountsDbContext db, AccountUser user, CancellationToken cancellationToken)
     {
-        var lockKey = $"accounts.sign_in:{user.Id}";
-        await db.Database.ExecuteSqlAsync($"select pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+        await AdvisoryLock.AcquireAsync(db.Database, "accounts.sign_in", user.Id.ToString(), cancellationToken);
         // The user was loaded before the lock, so its failed-attempt count may be stale.
         await db.Entry(user).ReloadAsync(cancellationToken);
     }

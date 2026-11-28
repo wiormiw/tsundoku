@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.Extensions.Options;
 using Tsundoku.Api.Http;
 using Tsundoku.Api.Identity;
 using Tsundoku.Common.Identity;
@@ -52,11 +53,12 @@ internal static class ApiHosting
         // Timeouts: a slow request ends and frees its connection (tip 26.01).
         services.AddRequestTimeouts(timeouts => timeouts.DefaultPolicy = new RequestTimeoutPolicy { Timeout = limits.RequestTimeout });
 
-        // Proxies: trust X-Forwarded-For and -Proto only from the known proxies (tip 26.03).
-        services.Configure<ForwardedHeadersOptions>(forwarded =>
+        // Proxies: trust X-Forwarded-For and -Proto only from the known proxies (tip 26.03). The per-address rate limits key on the
+        // address this yields, so behind an untrusted proxy every client shares one bucket.
+        services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<ApiLimitsOptions>>((forwarded, apiLimits) =>
         {
             forwarded.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            foreach (var proxy in limits.KnownProxies) forwarded.KnownProxies.Add(IPAddress.Parse(proxy));
+            foreach (var proxy in apiLimits.Value.KnownProxies) forwarded.KnownProxies.Add(IPAddress.Parse(proxy));
         });
 
         services.AddOpenApi();

@@ -20,10 +20,10 @@ public sealed class RateLimitTests(ApiFactory factory)
         new(factory.Services.GetRequiredService<IConnectionMultiplexer>(), Options.Create(new RateLimitOptions()), clock, LoggerFactory.Create(_ => { }).CreateLogger<ValkeyTokenBucket>());
 
     /// <summary>A server that limits tightly, with its own client address: the Valkey is shared, so the buckets must not be.</summary>
-    private HttpClient LimitedClient(IReadOnlyDictionary<string, string> settings, string? user = null)
+    private HttpClient LimitedClient(IReadOnlyDictionary<string, string> settings, string? user = null, IPAddress? address = null)
     {
         Assert.SkipWhen(factory.DockerUnavailableReason is not null, factory.DockerUnavailableReason ?? "");
-        var address = new IPAddress(Guid.NewGuid().ToByteArray()[..4]);
+        address ??= new IPAddress(Guid.NewGuid().ToByteArray()[..4]);
         var child = factory.WithWebHostBuilder(host =>
         {
             foreach (var (name, value) in settings) host.UseSetting(name, value);
@@ -140,6 +140,30 @@ public sealed class RateLimitTests(ApiFactory factory)
         }
 
         last!.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task A_known_proxy_gives_each_forwarded_address_its_own_bucket()
+    {
+        var proxy = new IPAddress(Guid.NewGuid().ToByteArray()[..4]);
+        using var client = LimitedClient(new Dictionary<string, string>
+        {
+            ["RateLimits:Credentials:TokenLimit"] = "1",
+            ["ApiLimits:KnownProxies:0"] = proxy.ToString(),
+        }, address: proxy);
+        string NewAddress() => new IPAddress(Guid.NewGuid().ToByteArray()[..4]).ToString();
+
+        Task<HttpResponseMessage> SignInFrom(string forwarded)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/sign-in") { Content = JsonContent.Create(new { email = "a@example.test", password = "x" }) };
+            request.Headers.Add("X-Forwarded-For", forwarded);
+            return client.SendAsync(request, Ct);
+        }
+
+        var (first, second) = (NewAddress(), NewAddress());
+        (await SignInFrom(first)).StatusCode.ShouldNotBe(HttpStatusCode.TooManyRequests);
+        (await SignInFrom(second)).StatusCode.ShouldNotBe(HttpStatusCode.TooManyRequests, "the proxy's other clients have their own buckets");
+        (await SignInFrom(first)).StatusCode.ShouldBe(HttpStatusCode.TooManyRequests, "the bucket is the forwarded address's");
     }
 
     [Fact]

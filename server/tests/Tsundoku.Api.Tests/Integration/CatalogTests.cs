@@ -16,19 +16,28 @@ public sealed class CatalogTests(ApiFactory factory)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    /// <summary>Tables outside the system schemas with an owner column but without forced RLS and a policy that reads the setting through nullif.</summary>
-    private const string UnguardedTables = $"""
+    /// <summary>
+    /// Tables outside the system schemas with an owner column that are not guarded: forced RLS, and the owner policy as the only
+    /// permissive one (permissive policies OR together, so any other would widen it). That policy is for every command, to the app role
+    /// only, and its USING and WITH CHECK are both exactly the owner column compared with the setting read through nullif.
+    /// </summary>
+    private const string UnguardedTables = $$"""
         select n.nspname || '.' || c.relname
         from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
         where c.relkind in ('r', 'p')
           and n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg\_%'
-          and exists (select from pg_attribute a where a.attrelid = c.oid and a.attname = '{RowLevelSecurity.OwnerColumn}' and not a.attisdropped)
-          and not (c.relrowsecurity and c.relforcerowsecurity and exists (
-              select from pg_policy p
-              where p.polrelid = c.oid
-                and pg_get_expr(p.polqual, p.polrelid) like '%current_setting(''app.user_id''%'
-                and pg_get_expr(p.polqual, p.polrelid) ilike '%nullif%'))
+          and exists (select from pg_attribute a where a.attrelid = c.oid and a.attname = '{{RowLevelSecurity.OwnerColumn}}' and not a.attisdropped)
+          and not (c.relrowsecurity and c.relforcerowsecurity
+              and (select count(*) from pg_policy p where p.polrelid = c.oid and p.polpermissive) = 1
+              and exists (
+                  select from pg_policy p
+                  where p.polrelid = c.oid and p.polpermissive
+                    and p.polcmd = '*'
+                    and p.polroles = array[(select oid from pg_roles where rolname = '{{RowLevelSecurity.AppRole}}')]::oid[]
+                    and pg_get_expr(p.polqual, p.polrelid) = pg_get_expr(p.polwithcheck, p.polrelid)
+                    and pg_get_expr(p.polqual, p.polrelid)
+                        ~ '^\(\(?{{RowLevelSecurity.OwnerColumn}}\)?(::[\w ]+)? = \(?NULLIF\(current_setting\(''app\.user_id''::text, true\), ''''::text\)\)?(::[\w ]+)?\)$'))
         order by 1
         """;
 
@@ -78,6 +87,34 @@ public sealed class CatalogTests(ApiFactory factory)
         try
         {
             (await Rows(UnguardedTables)).ShouldContain("catalog_probe.t");
+        }
+        finally
+        {
+            await Execute("drop schema if exists catalog_probe cascade");
+        }
+    }
+
+    /// <summary>A probe table guarded by the migrations' own SQL passes; each way to widen or skip its policy is flagged.</summary>
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("create policy wide on catalog_probe.t for select to tsundoku_app using (true);", true)]
+    [InlineData("create policy narrow on catalog_probe.t as restrictive for all to tsundoku_app using (true);", false)]
+    [InlineData("alter policy t_owner on catalog_probe.t to public;", true)]
+    [InlineData("alter policy t_owner on catalog_probe.t with check (true);", true)]
+    [InlineData("alter policy t_owner on catalog_probe.t using (user_id is not null);", true)]
+    [InlineData("alter table catalog_probe.t no force row level security;", true)]
+    public async Task The_check_flags_a_widened_or_partial_policy(string change, bool flagged)
+    {
+        await Execute($"""
+            drop schema if exists catalog_probe cascade;
+            create schema catalog_probe;
+            create table catalog_probe.t (user_id uuid);
+            {RowLevelSecurity.OwnerPolicySql("catalog_probe", "t", "uuid")}
+            {change}
+            """);
+        try
+        {
+            (await Rows(UnguardedTables)).Contains("catalog_probe.t").ShouldBe(flagged, change);
         }
         finally
         {

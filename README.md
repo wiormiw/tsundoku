@@ -43,3 +43,8 @@ docker compose -f deploy/compose.yaml up -d --build --wait
 ```
 
 The API on 127.0.0.1:4600, Grafana on 127.0.0.1:4630, OTLP/gRPC on 4617, OTLP/HTTP on 4618.
+
+Put a reverse proxy (TLS) in front of 127.0.0.1:4600, and make it send `X-Forwarded-For` with the client's address. The API
+trusts that header only from the compose network's gateway (`172.30.46.1`, where every published-port connection comes from);
+without the header, all clients share one rate-limit bucket. An existing `pgdata` volume keeps the Postgres password it was
+created with (`tsundoku` for volumes made before `POSTGRES_PASSWORD` existed): set `POSTGRES_PASSWORD` in `deploy/.env` to it.

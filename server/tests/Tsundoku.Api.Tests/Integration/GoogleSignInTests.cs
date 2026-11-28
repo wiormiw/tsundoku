@@ -99,21 +99,20 @@ public sealed class GoogleSignInTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task An_unconfirmed_local_account_is_409_and_not_linked()
+    public async Task Google_takes_an_unconfirmed_account_back_from_whoever_registered_it()
     {
+        // The attacker registers the victim's address with a password of their own, and cannot confirm it.
         using var client = factory.CreateApiClient(user: null);
         var email = await SignUpAsync(client, Ct);
 
-        using var response = await Google(client, Mint(GoogleTokens.NewSubject(), email));
+        var victim = await MeOf(client, await GoogleSignedIn(client, GoogleTokens.NewSubject(), email));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await response.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.email_unconfirmed");
-        await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
-        await connection.OpenAsync(Ct);
-        await using var command = new NpgsqlCommand(
-            "select count(*) from accounts.user_logins l join accounts.users u on u.id = l.user_id where u.email = @email", connection);
-        command.Parameters.AddWithValue("email", email);
-        ((long)(await command.ExecuteScalarAsync(Ct))!).ShouldBe(0);
+        victim.EmailConfirmed.ShouldBeTrue();
+        victim.HasPassword.ShouldBeFalse();
+        (await GoogleLogins(victim.Id)).ShouldBe(1);
+        using var attacker = await SignIn(client, email, Password, Ct);
+        attacker.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await attacker.Content.ReadAsStringAsync(Ct)).ShouldContain("accounts.invalid_credentials");
     }
 
     [Fact]
@@ -206,24 +205,32 @@ public sealed class GoogleSignInTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task An_unverified_google_email_neither_signs_up_nor_links()
+    public async Task An_unverified_google_email_gets_one_answer_whether_or_not_an_account_has_it()
     {
         var (confirmed, _) = await SignUpConfirmedAsync(factory, Ct);
-        using var client = factory.CreateApiClient(user: null);
-        var fresh = NewEmail();
+        string unconfirmed;
+        using (var open = factory.CreateApiClient(user: null)) unconfirmed = await SignUpAsync(open, Ct);
+        var unknown = NewEmail();
+        // Closed sign-up, where an unknown verified address would get 403: an unverified one must not reach that branch either.
+        using var closed = factory.WithWebHostBuilder(host => host.UseSetting("Accounts:SignUpEnabled", "false"));
+        using var client = closed.CreateClient();
 
-        foreach (var email in new[] { fresh, confirmed })
+        var bodies = new List<string>();
+        foreach (var email in new[] { confirmed, unconfirmed, unknown })
         {
             using var response = await Google(client, GoogleTokens.Mint(GoogleTokens.NewSubject(), email, DateTimeOffset.UtcNow, emailVerified: false));
-            response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+            response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized, email);
+            bodies.Add(await ProblemBody(response, Ct));
         }
 
-        (await UsersWithEmail(fresh)).ShouldBe(0);
+        bodies[0].ShouldContain("accounts.invalid_credentials");
+        bodies.Distinct().Count().ShouldBe(1, string.Join('\n', bodies));
+        (await UsersWithEmail(unknown)).ShouldBe(0);
         await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
         await connection.OpenAsync(Ct);
         await using var command = new NpgsqlCommand(
-            "select count(*) from accounts.user_logins l join accounts.users u on u.id = l.user_id where u.email = @email", connection);
-        command.Parameters.AddWithValue("email", confirmed);
+            "select count(*) from accounts.user_logins l join accounts.users u on u.id = l.user_id where u.email = any(@emails)", connection);
+        command.Parameters.AddWithValue("emails", new[] { confirmed, unconfirmed });
         ((long)(await command.ExecuteScalarAsync(Ct))!).ShouldBe(0);
     }
 

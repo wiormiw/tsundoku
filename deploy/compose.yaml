@@ -3,6 +3,8 @@
 #   docker compose -f deploy/compose.yaml up -d --build --wait
 # Every port is loopback-only: a bare "4632:5432" binds
 # 0.0.0.0 and offers the database to the whole LAN.
+# The API sees every published-port connection as coming from the network's gateway (172.30.46.1), so that is the one proxy it
+# trusts: the reverse proxy in front must send X-Forwarded-For, or every client shares one rate-limit bucket.
 
 name: tsundoku
 
@@ -10,7 +12,9 @@ services:
   postgres:
     image: postgres:18
     environment:
-      POSTGRES_PASSWORD: tsundoku
+      # Read only when the volume is first created: an existing volume keeps the password it was made with (tsundoku, for volumes
+      # from before this variable), so set POSTGRES_PASSWORD to that.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
       POSTGRES_DB: tsundoku
     ports:
       - '127.0.0.1:4632:5432'
@@ -44,7 +48,7 @@ services:
       target: api
     command: ['migrate']
     environment:
-      ConnectionStrings__appdb-owner: 'Host=postgres;Database=tsundoku;Username=postgres;Password=tsundoku'
+      ConnectionStrings__appdb-owner: 'Host=postgres;Database=tsundoku;Username=postgres;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}'
       ConnectionStrings__appdb: 'Host=postgres;Database=tsundoku;Username=tsundoku_api;Password=${APP_DB_PASSWORD:?set APP_DB_PASSWORD in deploy/.env}'
       ConnectionStrings__valkey: valkey:6379
       Accounts__PublicBaseUrl: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in deploy/.env}
@@ -61,6 +65,8 @@ services:
       Accounts__PublicBaseUrl: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in deploy/.env}
       Accounts__SignUpEnabled: ${SIGNUP_ENABLED:-false}
       Accounts__Google__ClientIds__0: ${GOOGLE_CLIENT_ID:-}
+      # The gateway of the network below: published-port traffic arrives from it (see the top of this file).
+      ApiLimits__KnownProxies__0: 172.30.46.1
       OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
       OTEL_SERVICE_NAME: tsundoku-api
     ports:
@@ -164,6 +170,14 @@ services:
         condition: service_started
       prometheus:
         condition: service_healthy
+
+# A fixed subnet, so the gateway the API trusts as its proxy is a known address.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.46.0/24
+          gateway: 172.30.46.1
 
 volumes:
   pgdata:

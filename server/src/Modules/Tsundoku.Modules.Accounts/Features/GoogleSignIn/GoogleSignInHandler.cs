@@ -5,15 +5,16 @@ using Npgsql;
 using Tsundoku.Common.Domain;
 using Tsundoku.Common.Domain.Results;
 using Tsundoku.Common.Messaging;
+using Tsundoku.Common.Persistence;
 using Tsundoku.Modules.Accounts.Domain;
 using Tsundoku.Modules.Accounts.Persistence;
 
 namespace Tsundoku.Modules.Accounts.Features.GoogleSignIn;
 
 /// <summary>
-/// A known Google login signs in. Otherwise a confirmed account with the same, Google-verified email is linked, and a new address
-/// gets a confirmed account without a password, if sign-up is open. An unconfirmed account is never linked. The unit of work saves;
-/// UserManager's own saves happen inside its transaction.
+/// A known Google login signs in. Otherwise the email must be Google-verified: an account with that email is linked (an unconfirmed
+/// one is first taken back from whoever registered it), and a new address gets a confirmed account without a password, if sign-up is
+/// open. The unit of work saves; UserManager's own saves happen inside its transaction.
 /// </summary>
 internal sealed partial class GoogleSignInHandler(
     SignInManager<AccountUser> signIn,
@@ -31,18 +32,18 @@ internal sealed partial class GoogleSignInHandler(
             return AccountErrors.GoogleTokenInvalid;
 
         // Two first sign-ins of one Google account at once would both create it; the second waits and finds the login.
-        var lockKey = $"accounts.google:{identity.Subject}";
-        await db.Database.ExecuteSqlAsync($"select pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+        await AdvisoryLock.AcquireAsync(db.Database, "accounts.google", identity.Subject, cancellationToken);
 
         var users = signIn.UserManager;
         var user = await users.FindByLoginAsync(GoogleIdTokenVerifier.LoginProvider, identity.Subject);
         if (user is null)
         {
+            // Before any lookup by email: an unverified address gets one answer, whether or not an account has it.
+            if (!identity.EmailVerified) return AccountErrors.GoogleTokenInvalid;
             var login = new UserLoginInfo(GoogleIdTokenVerifier.LoginProvider, identity.Subject, GoogleIdTokenVerifier.LoginProvider);
             if (await users.FindByEmailAsync(identity.Email) is { } existing)
             {
-                if (!existing.EmailConfirmed) return AccountErrors.EmailUnconfirmed;
-                if (!identity.EmailVerified) return AccountErrors.GoogleTokenInvalid;
+                if (!existing.EmailConfirmed) await ReclaimAsync(users, existing, cancellationToken);
                 // One Google account per user: a recycled Google address (a new sub) must not take over the account.
                 if ((await users.GetLoginsAsync(existing)).Any(linked => linked.LoginProvider == GoogleIdTokenVerifier.LoginProvider))
                 {
@@ -57,7 +58,6 @@ internal sealed partial class GoogleSignInHandler(
             {
                 // The sign-up switch closes Google too, or Google would be a way around it.
                 if (!options.Value.SignUpEnabled) return AccountErrors.SignUpClosed;
-                if (!identity.EmailVerified) return AccountErrors.GoogleTokenInvalid;
                 user = new AccountUser { UserName = identity.Email, Email = identity.Email, EmailConfirmed = true };
                 if (await CreateAsync(users, user, cancellationToken) is { } conflict) return conflict;
                 Ensure(await users.AddLoginAsync(user, login), "linking");
@@ -70,6 +70,22 @@ internal sealed partial class GoogleSignInHandler(
         db.Sessions.Add(session);
         Log.SignedIn(logger, user.Id, session.Id.Value);
         return new SignedIn(await SessionPrincipal.CreateAsync(signIn, user, session, cancellationToken));
+    }
+
+    /// <summary>
+    /// Google has just proved the address; whoever registered it unconfirmed never did, and may be someone else (pre-account takeover).
+    /// So the account loses that password and every session, and its stamp changes, before the Google login is linked.
+    /// </summary>
+    private async Task ReclaimAsync(UserManager<AccountUser> users, AccountUser user, CancellationToken cancellationToken)
+    {
+        user.EmailConfirmed = true;
+        // RemovePasswordAsync also rotates the security stamp, and its save carries the confirmation.
+        Ensure(await users.RemovePasswordAsync(user), "removing the password");
+        var now = clock.GetUtcNow();
+        var owner = new UserId(user.Id.ToString());
+        foreach (var session in await db.Sessions.Where(s => s.UserId == owner && s.RevokedAt == null).ToListAsync(cancellationToken))
+            session.Revoke(now);
+        Log.Reclaimed(logger, user.Id);
     }
 
     /// <summary>
@@ -113,5 +129,8 @@ internal sealed partial class GoogleSignInHandler(
 
         [LoggerMessage(EventId = 2053, Level = LogLevel.Information, Message = "Signed up user {UserId} with Google")]
         public static partial void SignedUp(ILogger logger, Guid userId);
+
+        [LoggerMessage(EventId = 2055, Level = LogLevel.Warning, Message = "Unconfirmed user {UserId} taken over by its verified Google address: password removed, sessions revoked")]
+        public static partial void Reclaimed(ILogger logger, Guid userId);
     }
 }

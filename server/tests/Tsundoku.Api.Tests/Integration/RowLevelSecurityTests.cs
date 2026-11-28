@@ -115,6 +115,27 @@ public sealed class RowLevelSecurityTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task A_user_cannot_insert_or_move_a_row_to_another_users_id()
+    {
+        var (a, b) = (NewUser(), NewUser());
+        var parent = Guid.CreateVersion7();
+        await using var probe = await Probe(parent, a);
+        var other = Guid.Parse(b.Value);
+
+        async Task RefusedAs(UserId user, FormattableString sql)
+        {
+            await using var db = App();
+            await using var transaction = await RowLevelSecurity.BeginTransactionAsync(db.Database, user, Ct);
+            var refused = await Should.ThrowAsync<PostgresException>(() => db.Database.ExecuteSqlAsync(sql, Ct));
+            refused.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
+        }
+
+        // WITH CHECK: the new row must belong to the transaction's user, on insert and on update alike.
+        await RefusedAs(a, $"insert into rls_probe.items values ({Guid.CreateVersion7()}, {other}, {parent})");
+        await RefusedAs(a, $"update rls_probe.items set user_id = {other}");
+    }
+
+    [Fact]
     public async Task The_setting_is_empty_after_commit_rollback_and_cancel_on_the_same_connection()
     {
         var a = NewUser();
